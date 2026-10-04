@@ -1,0 +1,246 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>SURGE — Government Dashboard</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: system-ui, sans-serif; margin: 0; background: #0b1220; color: #e6edf3; }
+    header { display: flex; align-items: center; gap: 16px; padding: 10px 16px; background: #121b2e; border-bottom: 1px solid #22304a; }
+    header h1 { font-size: 18px; margin: 0; }
+    select, input, textarea, button { font: inherit; }
+    .layout { display: grid; grid-template-columns: 360px 1fr; gap: 12px; padding: 12px; height: calc(100vh - 53px); }
+    .col { display: flex; flex-direction: column; gap: 12px; overflow: auto; }
+    .card { background: #121b2e; border: 1px solid #22304a; border-radius: 10px; padding: 12px; }
+    .card h3 { margin: 0 0 8px; font-size: 14px; color: #9fb0c3; text-transform: uppercase; letter-spacing: .04em; }
+    #map { height: 100%; min-height: 420px; border-radius: 10px; }
+    .area-row { display: flex; justify-content: space-between; padding: 8px; border-radius: 8px; cursor: pointer; border: 1px solid transparent; }
+    .area-row:hover { background: #0e1830; }
+    .area-row.active { border-color: #4b7bec; background: #0e1830; }
+    .pill { font-size: 11px; padding: 2px 8px; border-radius: 999px; }
+    .sev-severe, .sev-critical { background: #7f1d1d; }
+    .sev-high, .sev-warning { background: #9a3412; }
+    .sev-moderate, .sev-advisory { background: #854d0e; }
+    .sev-low, .sev-info { background: #14532d; }
+    label { display: block; font-size: 12px; margin: 8px 0 3px; color: #9fb0c3; }
+    input, select, textarea { width: 100%; padding: 7px; background: #0b1220; color: #e6edf3; border: 1px solid #22304a; border-radius: 6px; }
+    button.primary { background: #4b7bec; color: white; border: none; padding: 9px; border-radius: 6px; cursor: pointer; width: 100%; margin-top: 10px; }
+    button.primary:hover { background: #3867d6; }
+    .report { border-bottom: 1px solid #22304a; padding: 7px 0; font-size: 13px; }
+    .report .k { font-weight: 600; }
+    .muted { color: #6b7a90; font-size: 12px; }
+    .ok { color: #4ade80; } .err { color: #f87171; }
+    .layout.full { grid-template-columns: 1fr; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>🖥️ SURGE Government Dashboard</h1>
+    <span class="muted" id="status">loading…</span>
+    <span style="margin-left:auto" class="muted">area:</span>
+    <select id="areaSelect"></select>
+  </header>
+
+  <div class="layout">
+    <div class="col">
+      <div class="card">
+        <h3>Areas (ranked by priority)</h3>
+        <div id="areaList"></div>
+      </div>
+
+      <div class="card">
+        <h3>Publish / update directive</h3>
+        <label>Instruction type</label>
+        <select id="instrType">
+          <option value="evacuate">evacuate</option>
+          <option value="shelter_in_place">shelter_in_place</option>
+          <option value="advisory">advisory</option>
+          <option value="all_clear">all_clear</option>
+        </select>
+        <label>Message (the context pushed to residents + agent)</label>
+        <textarea id="msg" rows="3">Evacuate affected wards immediately using the approved route.</textarea>
+        <div id="evacFields">
+          <label>Shelter</label>
+          <select id="shelter"></select>
+          <label>Approved route</label>
+          <select id="route"></select>
+        </div>
+        <label>Roads to avoid</label>
+        <select id="roads" multiple size="2"></select>
+        <label>Next update (minutes)</label>
+        <input id="freq" type="number" value="60" />
+        <button class="primary" id="publishBtn">Publish directive</button>
+        <div id="publishMsg" class="muted"></div>
+      </div>
+
+      <div class="card">
+        <h3>Operational events</h3>
+        <div id="events"></div>
+      </div>
+    </div>
+
+    <div class="col">
+      <div id="map"></div>
+      <div class="card">
+        <h3>Incoming community reports</h3>
+        <div id="reports"></div>
+      </div>
+    </div>
+  </div>
+
+  <script src="common.js"></script>
+  <script>
+    let current = "sunsari";
+    let map, layer, detailCache = {};
+
+    function initMap() {
+      map = L.map("map").setView(AREA_CENTERS[current], 12);
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        maxZoom: 19, attribution: "© OpenStreetMap",
+      }).addTo(map);
+      layer = L.layerGroup().addTo(map);
+    }
+
+    function fillAreaSelect() {
+      const sel = document.getElementById("areaSelect");
+      sel.innerHTML = AREAS.map(a => `<option value="${a}">${AREA_LABELS[a]}</option>`).join("");
+      sel.value = current;
+      sel.onchange = () => { current = sel.value; onAreaChange(); };
+    }
+
+    async function onAreaChange() {
+      map.setView(AREA_CENTERS[current], 12);
+      await loadDetail();
+      await refresh();
+      document.querySelectorAll(".area-row").forEach(r =>
+        r.classList.toggle("active", r.dataset.area === current));
+    }
+
+    async function loadDetail() {
+      const d = await api(`/api/areas/${current}`);
+      detailCache[current] = d;
+      // Populate publish form dropdowns from the area catalog.
+      document.getElementById("shelter").innerHTML =
+        d.shelters.map(s => `<option value="${s.id}">${s.name}</option>`).join("");
+      document.getElementById("route").innerHTML =
+        d.routes.map(r => `<option value="${r.id}">${r.name}</option>`).join("");
+      document.getElementById("roads").innerHTML =
+        d.roads.map(r => `<option value="${r.id}">${r.name} (${r.status})</option>`).join("");
+    }
+
+    function renderAreaList(areas) {
+      const el = document.getElementById("areaList");
+      el.innerHTML = areas.map(a => `
+        <div class="area-row ${a.area_id === current ? "active" : ""}" data-area="${a.area_id}">
+          <span>${a.name}</span>
+          <span>
+            <span class="pill sev-${a.risk.risk_level}">${a.risk.risk_level}</span>
+            <span class="pill sev-${a.priority.priority_level}">${a.priority.priority_level}</span>
+          </span>
+        </div>`).join("");
+      el.querySelectorAll(".area-row").forEach(r =>
+        r.onclick = () => { current = r.dataset.area; document.getElementById("areaSelect").value = current; onAreaChange(); });
+    }
+
+    function drawMap(mapData, detail) {
+      layer.clearLayers();
+      (detail.shelters || []).forEach(s => {
+        if (s.location) L.marker([s.location.coordinates[1], s.location.coordinates[0]], { icon: emojiIcon(MARKERS.shelter) })
+          .bindPopup("Shelter: " + s.name).addTo(layer);
+      });
+      (detail.hospitals || []).forEach(h => {
+        if (h.location) L.marker([h.location.coordinates[1], h.location.coordinates[0]], { icon: emojiIcon(MARKERS.hospital) })
+          .bindPopup("Hospital: " + h.name).addTo(layer);
+      });
+      (mapData.closed_roads || []).forEach(r => {
+        if (r.geometry) L.marker([r.geometry.coordinates[1], r.geometry.coordinates[0]], { icon: emojiIcon(MARKERS.closed_road) })
+          .bindPopup("Closed road: " + r.name).addTo(layer);
+      });
+      if (mapData.approved_route && mapData.approved_route.geometry) {
+        const coords = mapData.approved_route.geometry.coordinates.map(c => [c[1], c[0]]);
+        L.polyline(coords, { color: "#4b7bec", weight: 5 }).bindPopup("Route: " + mapData.approved_route.name).addTo(layer);
+      }
+      (mapData.reports || []).forEach(rep => {
+        const c = rep.location.coordinates;
+        L.marker([c[1], c[0]], { icon: emojiIcon(reportEmoji(rep.kind)) })
+          .bindPopup(`<b>${rep.kind}</b><br>${rep.message}`).addTo(layer);
+      });
+    }
+
+    function renderReports(reports) {
+      document.getElementById("reports").innerHTML = reports.length
+        ? reports.map(r => `<div class="report"><span class="k">${reportEmoji(r.kind)} ${r.kind}</span>
+            — ${r.message}<br><span class="muted">${r.location.coordinates[1].toFixed(4)}, ${r.location.coordinates[0].toFixed(4)} · ${r.verification_state}</span></div>`).join("")
+        : `<div class="muted">No reports yet.</div>`;
+    }
+
+    function renderEvents(events) {
+      document.getElementById("events").innerHTML = events.length
+        ? events.map(e => `<div class="report"><span class="k">${e.kind}</span> — ${e.summary}</div>`).join("")
+        : `<div class="muted">No events yet.</div>`;
+    }
+
+    async function refresh() {
+      try {
+        const dash = await api("/api/government/dashboard");
+        renderAreaList(dash.areas);
+        renderEvents(dash.events);
+        document.getElementById("status").textContent =
+          `publication_state: ${dash.freshness.publication_state}`;
+        const mapData = await api(`/api/public/map/${current}`);
+        const detail = detailCache[current] || await api(`/api/areas/${current}`);
+        drawMap(mapData, detail);
+        const rep = await api(`/api/government/reports?area_id=${current}`);
+        renderReports(rep.reports);
+      } catch (e) {
+        document.getElementById("status").innerHTML = `<span class="err">${e.message}</span>`;
+      }
+    }
+
+    document.getElementById("instrType").onchange = (e) => {
+      document.getElementById("evacFields").style.display =
+        e.target.value === "evacuate" ? "block" : "none";
+    };
+
+    document.getElementById("publishBtn").onclick = async () => {
+      const type = document.getElementById("instrType").value;
+      const body = {
+        publication_id: "pub-" + (crypto.randomUUID ? crypto.randomUUID() : Date.now()),
+        area_id: current,
+        instruction_type: type,
+        emergency_message: document.getElementById("msg").value,
+        roads_to_avoid_ids: [...document.getElementById("roads").selectedOptions].map(o => o.value),
+        update_frequency_minutes: parseInt(document.getElementById("freq").value || "60", 10),
+      };
+      if (type === "evacuate") {
+        body.shelter_id = document.getElementById("shelter").value;
+        body.approved_route_id = document.getElementById("route").value;
+      }
+      if (type === "all_clear") {
+        const st = await api(`/api/public/status/${current}`);
+        body.cancels_instruction_id = st.instruction ? st.instruction.publication_id : null;
+      }
+      const out = document.getElementById("publishMsg");
+      try {
+        const res = await api("/api/government/instructions", { method: "POST", body: JSON.stringify(body) });
+        out.innerHTML = `<span class="ok">Published ${res.instruction.instruction_type} (severity ${res.instruction.severity}).</span>`;
+        await refresh();
+      } catch (e) {
+        out.innerHTML = `<span class="err">${e.message}</span>`;
+      }
+    };
+
+    (async function () {
+      fillAreaSelect();
+      initMap();
+      document.getElementById("instrType").dispatchEvent(new Event("change"));
+      await loadDetail();
+      await refresh();
+      setInterval(refresh, 3000);
+    })();
+  </script>
+</body>
+</html>

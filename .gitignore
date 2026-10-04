@@ -1,0 +1,8 @@
+.env
+rsa_key.p8
+rsa_key.pub
+__pycache__/
+*.pyc
+.venv/
+venv/
+node_modules/

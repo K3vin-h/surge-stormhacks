@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>SURGE — Disaster Relief</title>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 0; background: #0b1220; color: #e6edf3;
+           display: flex; min-height: 100vh; align-items: center; justify-content: center; }
+    .wrap { text-align: center; max-width: 640px; padding: 24px; }
+    h1 { font-size: 40px; margin: 0 0 8px; }
+    p { color: #9fb0c3; }
+    .cards { display: flex; gap: 16px; margin-top: 28px; flex-wrap: wrap; justify-content: center; }
+    a.card { flex: 1 1 220px; text-decoration: none; color: inherit; border: 1px solid #22304a;
+             border-radius: 12px; padding: 24px; background: #121b2e; transition: border-color .15s; }
+    a.card:hover { border-color: #4b7bec; }
+    .card .big { font-size: 34px; }
+    .card h2 { margin: 8px 0 4px; }
+    .card small { color: #9fb0c3; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>🌊 SURGE</h1>
+    <p>Two-way disaster-relief pipeline. Residents get live grounded advice; government sees where help is needed.</p>
+    <div class="cards">
+      <a class="card" href="/gov.html">
+        <div class="big">🖥️</div>
+        <h2>Government Dashboard</h2>
+        <small>Desktop · map, directives, incoming reports</small>
+      </a>
+      <a class="card" href="/victim.html">
+        <div class="big">📱</div>
+        <h2>Resident App</h2>
+        <small>Phone · directives, voice agent, report SOS</small>
+      </a>
+    </div>
+  </div>
+</body>
+</html>
