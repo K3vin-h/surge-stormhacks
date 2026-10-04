@@ -258,13 +258,8 @@ function icon(name, size = 18, strokeWidth = 1.8) {
 const BRAND_BASE = new URL("assets/brand/", (document.currentScript && document.currentScript.src) || location.href).href;
 const LOGO_SVG = `<img class="emblem" src="${BRAND_BASE}emblem.png" alt="" aria-hidden="true">`;
 
-// The brand's final E is three bars; the lower two are sage and the last one tapers to a point.
 function wordmark({ tagline = false } = {}) {
-  const e = `<svg class="wm-e" viewBox="0 0 66 70" aria-hidden="true">
-    <rect width="66" height="12.5" fill="currentColor"/>
-    <rect y="28.75" width="53" height="12.5" fill="#6f8462"/>
-    <path d="M0 57.5h54l12 6.25-12 6.25H0z" fill="#6f8462"/></svg>`;
-  return `<span class="wordmark" aria-label="SURGE"><span class="wm-word" aria-hidden="true">SURG${e}</span>${
+  return `<span class="wordmark"><span class="wm-word">SURGE</span>${
     tagline ? `<span class="wm-tag">Flood Response Intelligence</span>` : ""}</span>`;
 }
 
