@@ -20,8 +20,9 @@ const AREA_CENTERS = {
 function deviceId() {
   let id = localStorage.getItem("surge_device_id");
   if (!id) {
+    // getRandomValues works on plain-http origins where randomUUID doesn't.
     id = (crypto.randomUUID && crypto.randomUUID()) ||
-      "dev-" + Math.random().toString(36).slice(2);
+      "dev-" + Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) => b.toString(16).padStart(2, "0")).join("");
     localStorage.setItem("surge_device_id", id);
   }
   return id;

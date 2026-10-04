@@ -681,6 +681,7 @@
         const body = { area_id: current, question };
         if (myLoc) { body.latitude = myLoc.lat; body.longitude = myLoc.lng; }
         if (userLang) body.language = userLang;
+        body.device_id = deviceId();
         const r = await api("/api/chat", { method: "POST", body: JSON.stringify(body) });
         setThinking(false);
         handleAgent(r);
@@ -720,6 +721,7 @@
           fd.append("audio", blob, "clip.webm");
           if (myLoc) { fd.append("latitude", myLoc.lat); fd.append("longitude", myLoc.lng); }
           if (userLang) fd.append("language", userLang);
+          fd.append("device_id", deviceId());
           setThinking(true, "Transcribing…");
           try {
             const res = await fetch("/api/voice", { method: "POST", body: fd });
@@ -764,9 +766,12 @@
               location: { type: "Point", coordinates: [loc.lng, loc.lat] },
               reported_at: new Date().toISOString(),
               idempotency_key: deviceId() + ":" + kind + ":" + Date.now(),
+              device_id: deviceId(),
             }),
           });
-          out.innerHTML = `<span class="ok">${icon("check", 14)} Sent (${esc(VERIFICATION[r.verification_state] || r.verification_state)}). Emergency operations can see it now.</span>`;
+          out.innerHTML = r.moved && kind === "rescue_needed"
+            ? `<span class="ok">${icon("check", 14)} Your SOS location was updated. Emergency operations can see your new position.</span>`
+            : `<span class="ok">${icon("check", 14)} Sent (${esc(VERIFICATION[r.verification_state] || r.verification_state)}). Emergency operations can see it now.</span>`;
           out.querySelector(".icon").style.display = "inline";
           refresh();
         } catch (e) { out.innerHTML = `<span class="err">${esc(e.message)}</span>`; }

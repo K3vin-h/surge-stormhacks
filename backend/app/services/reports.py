@@ -1,6 +1,7 @@
 """Community road/rescue reports, persisted to Snowflake REPORTS."""
 from __future__ import annotations
 
+import threading
 import uuid
 
 from ..db import snowflake_client as sf
@@ -24,17 +25,58 @@ def _row_to_report(row: dict) -> Report:
     )
 
 
-def submit(req: SubmitReportRequest) -> tuple[Report, bool]:
-    """Returns (report, created). Idempotent on idempotency_key when provided."""
+# Serializes check-then-write so a double-tap can't insert two SOS rows.
+# ponytail: per-process lock; use a DB-level guard if running multiple workers.
+_submit_lock = threading.Lock()
+
+
+def submit(req: SubmitReportRequest) -> tuple[Report, bool, bool]:
+    with _submit_lock:
+        return _submit(req)
+
+
+def _submit(req: SubmitReportRequest) -> tuple[Report, bool, bool]:
+    """Returns (report, created, moved). Idempotent on idempotency_key when provided.
+
+    A rescue_needed from a device that already has an unresolved one moves that
+    report (same REPORT_ID) instead of creating another.
+    """
     if req.idempotency_key:
         existing = sf.query_one(
             "SELECT * FROM REPORTS WHERE IDEMPOTENCY_KEY = %s AND AREA_ID = %s",
             [req.idempotency_key, req.area_id],
         )
         if existing:
-            return _row_to_report(existing), False
+            return _row_to_report(existing), False, False
 
     received_at = now_utc()
+    if req.kind == ReportKind.rescue_needed and req.device_id:
+        prior = sf.query_one(
+            """SELECT * FROM REPORTS WHERE DEVICE_ID = %s AND KIND = %s
+               AND VERIFICATION_STATE <> %s ORDER BY RECEIVED_AT DESC LIMIT 1""",
+            [req.device_id, ReportKind.rescue_needed.value, VerificationState.resolved.value],
+        )
+        if prior:
+            sf.execute(
+                """UPDATE REPORTS SET AREA_ID = %s, LONGITUDE = %s, LATITUDE = %s,
+                       MESSAGE = %s, REPORTED_AT = %s, RECEIVED_AT = %s,
+                       VERIFICATION_STATE = %s, IDEMPOTENCY_KEY = %s WHERE REPORT_ID = %s""",
+                [
+                    req.area_id, req.location.lng, req.location.lat, req.message,
+                    req.reported_at, received_at,
+                    VerificationState.unverified.value, req.idempotency_key, prior["REPORT_ID"],
+                ],
+            )
+            prior.update(
+                AREA_ID=req.area_id, LONGITUDE=req.location.lng, LATITUDE=req.location.lat,
+                MESSAGE=req.message, REPORTED_AT=req.reported_at, RECEIVED_AT=received_at,
+                VERIFICATION_STATE=VerificationState.unverified.value,
+            )
+            events.record_event(
+                "report_update", f"rescue_needed moved in {req.area_id}", req.area_id
+            )
+            return _row_to_report(prior), False, True
+
     report = Report(
         report_id=str(uuid.uuid4()),
         area_id=req.area_id,
@@ -49,13 +91,13 @@ def submit(req: SubmitReportRequest) -> tuple[Report, bool]:
     sf.execute(
         """INSERT INTO REPORTS (
                REPORT_ID, AREA_ID, KIND, MESSAGE, LONGITUDE, LATITUDE,
-               VERIFICATION_STATE, REPORTED_AT, RECEIVED_AT, IDEMPOTENCY_KEY, PROVENANCE
-           ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
+               VERIFICATION_STATE, REPORTED_AT, RECEIVED_AT, IDEMPOTENCY_KEY, PROVENANCE, DEVICE_ID
+           ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
         [
             report.report_id, report.area_id, report.kind.value, report.message,
             report.location.lng, report.location.lat,
             report.verification_state.value, report.reported_at, report.received_at,
-            req.idempotency_key, report.provenance,
+            req.idempotency_key, report.provenance, req.device_id,
         ],
     )
     events.record_event(
@@ -63,7 +105,7 @@ def submit(req: SubmitReportRequest) -> tuple[Report, bool]:
         f"{req.kind.value} reported in {req.area_id}",
         req.area_id,
     )
-    return report, True
+    return report, True, False
 
 
 def set_state(report_id: str, state: VerificationState) -> Report | None:

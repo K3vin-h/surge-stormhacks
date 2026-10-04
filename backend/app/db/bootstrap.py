@@ -35,7 +35,8 @@ DDL = [
         REPORTED_AT        TIMESTAMP_TZ,
         RECEIVED_AT        TIMESTAMP_TZ NOT NULL,
         IDEMPOTENCY_KEY    STRING,
-        PROVENANCE         STRING
+        PROVENANCE         STRING,
+        DEVICE_ID          STRING
     )
     """,
     """
@@ -53,3 +54,11 @@ DDL = [
 def ensure_schema() -> None:
     for stmt in DDL:
         sf.execute(stmt)
+    # Upgrade tables created before DEVICE_ID existed. SQLite reports
+    # "duplicate column name", Snowflake "already exists"; anything else is real.
+    try:
+        sf.execute("ALTER TABLE REPORTS ADD COLUMN DEVICE_ID STRING")
+    except Exception as e:
+        msg = str(e).lower()
+        if "duplicate column" not in msg and "already exists" not in msg:
+            raise

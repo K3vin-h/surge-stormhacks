@@ -22,6 +22,8 @@ class ChatRequest(BaseModel):
     longitude: float | None = None
     # Optional language hint (BCP-47) carried from an earlier detected turn.
     language: str | None = None
+    # Browser device id so a chat SOS moves the device's existing pin.
+    device_id: str | None = Field(None, max_length=128)
 
 
 class AssistantResponse(BaseModel):
