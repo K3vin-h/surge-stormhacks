@@ -1,4 +1,5 @@
 import sys
+from datetime import timedelta
 from pathlib import Path
 
 import pytest
@@ -10,6 +11,7 @@ from app.errors import ApiError  # noqa: E402
 from app.schemas.common import GeoPoint, ReportKind, VerificationState  # noqa: E402
 from app.schemas.reports import SubmitReportRequest  # noqa: E402
 from app.services import reports  # noqa: E402
+from app.util import now_utc  # noqa: E402
 
 
 @pytest.fixture(autouse=True)
@@ -210,22 +212,23 @@ def test_concurrent_sos_from_one_device_makes_one_row():
 
     def attempt(_):
         try:
-            reports.submit(_req("d1"))
-        except ApiError:
-            pass  # duplicates are rejected, not inserted
+            return reports.submit(_req("d1"))[1]  # created
+        except ApiError as e:
+            return e.code
 
     with ThreadPoolExecutor(8) as ex:
-        list(ex.map(attempt, range(8)))
+        outcomes = list(ex.map(attempt, range(8)))
+    assert outcomes.count(True) == 1
+    assert outcomes.count("sos_already_sent") == 7
     assert len(_rows("d1")) == 1
 
 
 def test_repeat_sos_same_spot_is_rejected():
     reports.submit(_req("d1"))
     with pytest.raises(ApiError) as e:
-        reports.submit(_req("d1", msg="again"))
+        reports.submit(_req("d1"))
     assert (e.value.status_code, e.value.code) == (409, "sos_already_sent")
-    r = _rows("d1")[0]
-    assert r["MESSAGE"] == "help"
+    assert len(_rows("d1")) == 1
 
 
 def test_repeat_sos_within_gps_jitter_is_rejected():
@@ -248,3 +251,57 @@ def test_ensure_schema_adds_column_to_legacy_table():
         IDEMPOTENCY_KEY STRING, PROVENANCE STRING)""")
     bootstrap.ensure_schema()
     assert _rows("nobody") == []
+
+
+def test_repeat_sos_same_spot_different_area_still_moves():
+    from app.fixtures import areas as fx
+    a1, a2 = list(fx.AREAS)[:2]
+    first, *_ = reports.submit(_req("d1", area=a1))
+    second, created, moved = reports.submit(_req("d1", area=a2))
+    assert (second.report_id, created, moved) == (first.report_id, False, True)
+    assert second.area_id == a2
+
+
+@pytest.mark.parametrize("lng,rejected", [(85.00022, True), (85.00034, False)])  # ~19 m / ~30 m east
+def test_same_spot_boundary_is_about_25_metres(lng, rejected):
+    reports.submit(_req("d1"))
+    if rejected:
+        with pytest.raises(ApiError):
+            reports.submit(_req("d1", lng=lng))
+    else:
+        assert reports.submit(_req("d1", lng=lng))[2] is True
+
+
+@pytest.mark.parametrize("state", [VerificationState.duplicate, VerificationState.false_report])
+def test_dismissed_sos_can_be_sent_again_from_same_spot(state):
+    first, *_ = reports.submit(_req("d1"))
+    reports.set_state(first.report_id, state)
+    second, created, moved = reports.submit(_req("d1"))
+    assert (second.report_id, created, moved) == (first.report_id, False, True)
+    assert _rows("d1")[0]["VERIFICATION_STATE"] == "unverified"
+
+
+def test_changed_message_at_same_spot_updates_report_without_resetting_state():
+    first, *_ = reports.submit(_req("d1"))
+    reports.set_state(first.report_id, VerificationState.actioned)
+    second, created, moved = reports.submit(_req("d1", msg="leg broken, water rising"))
+    assert (second.report_id, created, moved) == (first.report_id, False, False)
+    r = _rows("d1")[0]
+    assert (r["MESSAGE"], r["VERIFICATION_STATE"]) == ("leg broken, water rising", "actioned")
+    assert (r["LONGITUDE"], r["LATITUDE"]) == (85.0, 28.0)
+
+
+def test_stale_sos_is_refreshed_not_rejected():
+    first, *_ = reports.submit(_req("d1"))
+    sf.execute(
+        "UPDATE REPORTS SET RECEIVED_AT = %s WHERE REPORT_ID = %s",
+        [now_utc() - timedelta(seconds=reports.SOS_GUARD_SECONDS + 60), first.report_id],
+    )
+    second, created, moved = reports.submit(_req("d1"))
+    assert (second.report_id, created) == (first.report_id, False)
+
+
+def test_replayed_key_at_same_spot_returns_existing_not_conflict():
+    first, *_ = reports.submit(_req("d1", key="k1"))
+    again, created, moved = reports.submit(_req("d1", key="k1"))
+    assert (again.report_id, created, moved) == (first.report_id, False, False)

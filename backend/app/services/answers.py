@@ -158,6 +158,7 @@ def agent_turn(
     report_filed = False
     report_id = None
     report_kind = None
+    already_sent = False  # an identical SOS from this spot is already with responders
     if event_type in gemini.REPORT_KINDS and location is not None:
         from ..schemas.common import GeoPoint, ReportKind
         from ..schemas.reports import SubmitReportRequest
@@ -176,12 +177,13 @@ def agent_turn(
             report_filed = True
             report_id = report.report_id
             report_kind = report.kind.value
-        except Exception:
+        except Exception as e:
             report_filed = False
+            already_sent = getattr(e, "code", None) == "sos_already_sent"
 
     if remember and question.strip():  # empty voice transcripts carry no context
         # Note a filed report so a follow-up doesn't file a duplicate.
-        note = " [A report was already filed to responders.]" if report_filed else ""
+        note = " [A report was already filed to responders.]" if report_filed or already_sent else ""
         memory.add_turn(mem_key, question, reply + note)
 
     return AssistantResponse(
