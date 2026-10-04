@@ -1,10 +1,12 @@
 """Community road/rescue reports, persisted to Snowflake REPORTS."""
 from __future__ import annotations
 
+import math
 import threading
 import uuid
 
 from ..db import snowflake_client as sf
+from ..errors import conflict
 from ..schemas.common import GeoPoint, ReportKind, VerificationState
 from ..schemas.reports import Report, SubmitReportRequest
 from ..util import now_utc
@@ -23,6 +25,20 @@ def _row_to_report(row: dict) -> Report:
         received_at=row["RECEIVED_AT"],
         provenance=row.get("PROVENANCE") or "resident_report",
     )
+
+
+# A repeat SOS within this distance (same area) is a duplicate, not a move.
+SAME_SPOT_METERS = 25.0
+# The duplicate guard only applies to a live SOS (not dismissed as duplicate /
+# false_report) that was last sent recently; older ones are refreshed instead.
+LIVE_SOS_STATES = {VerificationState.unverified, VerificationState.reviewed, VerificationState.actioned}
+SOS_GUARD_SECONDS = 60 * 60
+
+
+def _meters_apart(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
+    dlat = math.radians(lat2 - lat1)
+    dlng = math.radians(lng2 - lng1) * math.cos(math.radians((lat1 + lat2) / 2))
+    return 6371000.0 * math.hypot(dlat, dlng)  # equirectangular, fine at this scale
 
 
 # Serializes check-then-write so a double-tap can't insert two SOS rows.
@@ -51,7 +67,8 @@ def _submit(req: SubmitReportRequest) -> tuple[Report, bool, bool]:
     """Returns (report, created, moved). Idempotent on idempotency_key when provided.
 
     A rescue_needed from a device that already has an unresolved one moves that
-    report (same REPORT_ID) instead of creating another.
+    report (same REPORT_ID) instead of creating another, or raises a 409
+    `sos_already_sent` if the device has not moved.
     """
     if req.idempotency_key:
         existing = sf.query_one(
@@ -79,27 +96,49 @@ def _submit(req: SubmitReportRequest) -> tuple[Report, bool, bool]:
             [req.device_id, ReportKind.rescue_needed.value, VerificationState.resolved.value],
         )
         if prior:
+            prior_report = _row_to_report(prior)
+            same_spot = prior["AREA_ID"] == req.area_id and _meters_apart(
+                prior["LATITUDE"], prior["LONGITUDE"], req.location.lat, req.location.lng
+            ) <= SAME_SPOT_METERS
+            # Same spot, still a live recent SOS: keep the pin and state, only take a new message.
+            refresh_only = (
+                same_spot
+                and prior_report.verification_state in LIVE_SOS_STATES
+                and (received_at - prior_report.received_at).total_seconds() < SOS_GUARD_SECONDS
+            )
+            if refresh_only and req.message == prior["MESSAGE"]:
+                raise conflict(
+                    "Your location is already shared and you have already requested SOS. "
+                    "Responders can see you. Only send again if you have moved.",
+                    code="sos_already_sent",
+                )
             _remember_request(prior["AREA_ID"], prior.get("IDEMPOTENCY_KEY"), prior["REPORT_ID"])
+            if refresh_only:
+                lng, lat, state = prior["LONGITUDE"], prior["LATITUDE"], prior["VERIFICATION_STATE"]
+            else:
+                lng, lat, state = req.location.lng, req.location.lat, VerificationState.unverified.value
             sf.execute(
                 """UPDATE REPORTS SET AREA_ID = %s, LONGITUDE = %s, LATITUDE = %s,
                        MESSAGE = %s, REPORTED_AT = %s, RECEIVED_AT = %s,
                        VERIFICATION_STATE = %s, IDEMPOTENCY_KEY = %s WHERE REPORT_ID = %s""",
                 [
-                    req.area_id, req.location.lng, req.location.lat, req.message,
+                    req.area_id, lng, lat, req.message,
                     req.reported_at, received_at,
-                    VerificationState.unverified.value, req.idempotency_key, prior["REPORT_ID"],
+                    state, req.idempotency_key, prior["REPORT_ID"],
                 ],
             )
             prior.update(
-                AREA_ID=req.area_id, LONGITUDE=req.location.lng, LATITUDE=req.location.lat,
+                AREA_ID=req.area_id, LONGITUDE=lng, LATITUDE=lat,
                 MESSAGE=req.message, REPORTED_AT=req.reported_at, RECEIVED_AT=received_at,
-                VERIFICATION_STATE=VerificationState.unverified.value,
+                VERIFICATION_STATE=state,
             )
             _remember_request(req.area_id, req.idempotency_key, prior["REPORT_ID"])
             events.record_event(
-                "report_update", f"rescue_needed moved in {req.area_id}", req.area_id
+                "report_update",
+                f"rescue_needed {'updated' if refresh_only else 'moved'} in {req.area_id}",
+                req.area_id,
             )
-            return _row_to_report(prior), False, True
+            return _row_to_report(prior), False, not refresh_only
 
     report = Report(
         report_id=str(uuid.uuid4()),
