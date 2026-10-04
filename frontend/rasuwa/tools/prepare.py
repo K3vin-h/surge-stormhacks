@@ -67,7 +67,7 @@ def prepare(data):
             specific = tags.get("foot") if mode == "walking" else tags.get("motorcar", tags.get("motor_vehicle", tags.get("vehicle")))
             if specific in ("no", "private") or (tags.get("access") in ("no", "private") and specific not in ("yes", "designated", "permissive")):
                 continue
-            if mode == "vehicle" and (tags.get("highway") not in VEHICLE_ROADS or tags.get("motor_vehicle") == "no"):
+            if mode == "vehicle" and tags.get("highway") not in VEHICLE_ROADS:
                 continue
             if mode == "walking" and tags.get("highway") in ("motorway", "motorway_link", "construction", "proposed"):
                 continue
