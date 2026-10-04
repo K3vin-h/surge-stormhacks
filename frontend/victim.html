@@ -678,7 +678,7 @@
       setThinking(true, "Assistant is thinking…");
       await ensureLoc();
       try {
-        const body = { area_id: current, question };
+        const body = { area_id: current, question, device_id: deviceId() };
         if (myLoc) { body.latitude = myLoc.lat; body.longitude = myLoc.lng; }
         if (userLang) body.language = userLang;
         const r = await api("/api/chat", { method: "POST", body: JSON.stringify(body) });
@@ -717,6 +717,7 @@
           await ensureLoc();
           const fd = new FormData();
           fd.append("area_id", current);
+          fd.append("device_id", deviceId());
           fd.append("audio", blob, "clip.webm");
           if (myLoc) { fd.append("latitude", myLoc.lat); fd.append("longitude", myLoc.lng); }
           if (userLang) fd.append("language", userLang);

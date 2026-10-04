@@ -22,6 +22,9 @@ class ChatRequest(BaseModel):
     longitude: float | None = None
     # Optional language hint (BCP-47) carried from an earlier detected turn.
     language: str | None = None
+    # Client device id (a UUID from deviceId(), or its non-secure-context fallback);
+    # keys the per-device conversation memory.
+    device_id: str | None = Field(None, max_length=64)
 
 
 class AssistantResponse(BaseModel):

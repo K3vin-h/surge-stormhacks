@@ -12,7 +12,7 @@ from ..fixtures import areas as fx
 from ..schemas.chat import AssistantResponse
 from ..schemas.common import InstructionType
 from ..schemas.instructions import PublishedInstruction
-from . import cache, gemini, reports as reports_svc
+from . import cache, gemini, memory, reports as reports_svc
 
 AUTHORITY_LINE = "Contact your local emergency authority for anything not covered here."
 
@@ -107,6 +107,7 @@ def agent_turn(
     question: str,
     location: tuple[float, float] | None = None,
     language_hint: str | None = None,
+    device_id: str | None = None,
 ) -> AssistantResponse:
     """Primary chat/voice path.
 
@@ -117,7 +118,9 @@ def agent_turn(
     """
     inst = cache.get_current(area_id)
 
-    turn = gemini.converse(question, build_context(area_id), language_hint)
+    turn = gemini.converse(
+        question, build_context(area_id), language_hint, memory.get(device_id)
+    )
     if turn is not None:
         reply, event_type, summary = turn["reply"], turn["event_type"], turn["summary"]
         language = turn["language"]
@@ -135,6 +138,9 @@ def agent_turn(
 
     response_id = str(uuid.uuid4())
     cache.remember_response(response_id, reply)
+    # Skip empty transcripts and canned fallback replies (not model output).
+    if question.strip() and mode == "gemini_grounded":
+        memory.add_turn(device_id, question, reply)
 
     report_filed = False
     report_id = None
