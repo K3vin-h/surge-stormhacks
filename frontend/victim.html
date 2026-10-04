@@ -634,10 +634,11 @@
       $("agentStatus").textContent = label;
     }
 
-    let audio = null, ttsPending = 0, ttsGen = 0;
+    let audio = null, ttsPending = 0, ttsGen = 0, pendingTts = null;
     async function playTts(payload, btn) {
       const gen = ++ttsGen;
       ttsPending++;
+      pendingTts = payload;
       const original = btn ? btn.innerHTML : null;
       if (btn) btn.innerHTML = `<span class="spinner"></span>${btn.classList.contains("replay") ? "" : "Loading"}`;
       try {
@@ -654,6 +655,7 @@
       } catch (_) {
       } finally {
         ttsPending--;
+        if (gen === ttsGen) pendingTts = null;
         if (btn) btn.innerHTML = original;
       }
     }
@@ -711,7 +713,8 @@
     // utterance to /api/voice, the reply is spoken, then we listen again.
     // Talking over the assistant stops its audio (barge-in).
     // ponytail: RMS threshold VAD, swap for @ricky0123/vad-web if noisy rooms misfire.
-    const VAD = { startRms: 0.04, bargeRms: 0.09, bargeMs: 200, silenceMs: 1000, minSpeechMs: 300, maxClipMs: 20000, tickMs: 50 };
+    const VAD = { startRms: 0.04, bargeRms: 0.09, bargeMs: 200, silenceMs: 1000, minSpeechMs: 300, maxClipMs: 20000, tickMs: 50,
+                  calibTicks: 10, noiseFactor: 3, maxStartRms: 0.08 }; // ~0.5 s ambient sample sets the thresholds
     let call = null;
     const assistantSpeaking = () => ttsPending > 0 || (audio && !audio.paused && !audio.ended);
     const clipMime = () => ["audio/webm", "audio/mp4"].find((t) => MediaRecorder.isTypeSupported(t));
@@ -773,9 +776,16 @@
       const parts = [];
       rec.ondataavailable = (e) => parts.push(e.data);
       rec.onstop = () => {
-        if (c.discard || !call || c.voicedMs < VAD.minSpeechMs) { c.recording = false; return; }
-        const type = (rec.mimeType || "audio/webm").split(";")[0];
         c.recording = false;
+        if (c.discard || !call) return;
+        const { bargedAudio, bargedTts } = c;
+        c.bargedAudio = c.bargedTts = null;
+        if (c.voicedMs < VAD.minSpeechMs) { // a cough or click: restore what it interrupted
+          if (bargedTts) playTts(bargedTts); // a reply that was still loading
+          else if (bargedAudio && bargedAudio === audio && !audio.ended) audio.play().catch(() => {});
+          return;
+        }
+        const type = (rec.mimeType || "audio/webm").split(";")[0];
         sendClip(new Blob(parts, { type }));
       };
       rec.start();
@@ -789,15 +799,31 @@
       let sum = 0;
       for (const v of c.buf) sum += v * v;
       const rms = Math.sqrt(sum / c.buf.length);
+      if (c.calib) { // sample the room first; the median ignores a brief burst of speech
+        c.calib.push(rms);
+        if (c.calib.length < VAD.calibTicks) return;
+        const noise = [...c.calib].sort((a, b) => a - b)[VAD.calibTicks >> 1];
+        c.startRms = Math.min(VAD.maxStartRms, Math.max(VAD.startRms, noise * VAD.noiseFactor));
+        c.bargeRms = Math.max(VAD.bargeRms, c.startRms * (VAD.bargeRms / VAD.startRms));
+        c.calib = null;
+        $("agentStatus").textContent = "Live — listening… (headphones work best)";
+        return;
+      }
       const speaking = assistantSpeaking();
-      const loud = rms > (speaking ? VAD.bargeRms : VAD.startRms);
+      const loud = rms > (speaking ? c.bargeRms : c.startRms);
 
       if (!c.recording) {
         if (c.busy) return;
         // Over the assistant's voice, require sustained speech (echo guard) before barge-in.
         c.loudMs = loud ? (c.loudMs || 0) + VAD.tickMs : 0;
         if (!loud || (speaking && c.loudMs < VAD.bargeMs)) return;
-        if (speaking) { ttsGen++; if (audio) audio.pause(); } // barge-in
+        if (speaking) { // barge-in
+          const playing = audio && !audio.paused && !audio.ended;
+          c.bargedTts = ttsPending > 0 ? pendingTts : null;
+          c.bargedAudio = playing ? audio : null;
+          ttsGen++; // cancel a reply that is still loading
+          if (playing) audio.pause();
+        }
         $("agentStatus").textContent = "Live — hearing you…";
         beginClip(c);
       }
@@ -820,10 +846,13 @@
         const analyser = ctx.createAnalyser();
         analyser.fftSize = 1024;
         ctx.createMediaStreamSource(stream).connect(analyser);
-        call = { stream, ctx, analyser, buf: new Float32Array(analyser.fftSize), recording: false, busy: false };
+        call = {
+          stream, ctx, analyser, buf: new Float32Array(analyser.fftSize), recording: false, busy: false,
+          calib: [], startRms: VAD.startRms, bargeRms: VAD.bargeRms,
+        };
         call.timer = setInterval(vadTick, VAD.tickMs);
         setCallUi(true);
-        $("agentStatus").textContent = "Live — listening… (headphones work best)";
+        $("agentStatus").textContent = "Live — getting ready, stay quiet for a moment…";
       } catch (e) {
         if (stream) stream.getTracks().forEach((t) => t.stop());
         ctx.close().catch(() => {});
