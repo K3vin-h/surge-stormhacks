@@ -8,7 +8,7 @@ from pathlib import Path
 from fastapi import FastAPI
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from .config import get_settings
@@ -79,8 +79,23 @@ app.include_router(public.router)
 app.include_router(chat.router)
 app.include_router(demo_models.router)
 
-# Serve the bare-bones static frontend (gov dashboard + victim view) last so it
-# only catches paths the API routes above did not claim.
+# Serve the bare-bones static frontend (gov dashboard + victim view).
 FRONTEND_DIR = Path(__file__).resolve().parents[2] / "frontend"
+
+# Clean URLs (no .html). Served WITHOUT a trailing slash so the pages'
+# relative "common.js" still resolves to /common.js. Registered before the
+# static mount so they take precedence.
+_PAGES = {"/": "index.html", "/gov": "gov.html", "/victim": "victim.html"}
+
+
+def _make_page_route(filename: str):
+    def _route() -> FileResponse:
+        return FileResponse(FRONTEND_DIR / filename)
+    return _route
+
+
 if FRONTEND_DIR.exists():
+    for _path, _file in _PAGES.items():
+        app.add_api_route(_path, _make_page_route(_file), include_in_schema=False)
+    # Static mount last: serves common.js, assets, and the raw .html files too.
     app.mount("/", StaticFiles(directory=str(FRONTEND_DIR), html=True), name="frontend")
