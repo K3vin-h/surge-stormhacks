@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import threading
 
 from ..db import snowflake_client as sf
 from ..errors import conflict, not_found, validation_error
@@ -23,6 +24,8 @@ from ..schemas.instructions import (
 )
 from ..util import now_utc
 from . import cache, events
+
+_publish_lock = threading.Lock()
 
 SEVERITY_BY_TYPE = {
     InstructionType.evacuate: Severity.critical,
@@ -41,6 +44,8 @@ def _fingerprint(req: PublishInstructionRequest) -> str:
         "approved_route_id": req.approved_route_id,
         "roads_to_avoid_ids": sorted(req.roads_to_avoid_ids),
         "cancels_instruction_id": req.cancels_instruction_id,
+        "update_frequency_minutes": req.update_frequency_minutes,
+        "next_update_at": req.next_update_at.isoformat() if req.next_update_at else None,
     }
     blob = json.dumps(payload, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(blob.encode()).hexdigest()
@@ -158,6 +163,13 @@ def to_alert(inst: PublishedInstruction, superseded: bool = False) -> Alert:
 
 
 def publish(req: PublishInstructionRequest) -> PublishedInstruction:
+    # Serializes check-then-insert so concurrent identical publication_ids
+    # can't race to a 500 (SQLite) or duplicate rows (Snowflake).
+    with _publish_lock:
+        return _publish(req)
+
+
+def _publish(req: PublishInstructionRequest) -> PublishedInstruction:
     fingerprint = _fingerprint(req)
     existing = sf.query_one(
         "SELECT * FROM INSTRUCTIONS WHERE PUBLICATION_ID = %s", [req.publication_id]
@@ -166,7 +178,10 @@ def publish(req: PublishInstructionRequest) -> PublishedInstruction:
         # Idempotent replay (same id + same content) vs conflict.
         if existing.get("REQUEST_FINGERPRINT") == fingerprint:
             inst = _row_to_instruction(existing)
-            cache.set_current(inst)
+            # A replay must not roll the live cache back to an older instruction.
+            cur = cache.get_current(inst.area_id)
+            if cur is None or inst.published_at >= cur.published_at:
+                cache.set_current(inst)
             return inst
         raise conflict(
             "publication_id already used with different content.",

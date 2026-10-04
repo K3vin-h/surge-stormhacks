@@ -80,7 +80,6 @@ def _no_db(monkeypatch):
 
 def test_gemini_down_reports_english_not_the_stale_hint(monkeypatch):
     monkeypatch.setattr(gemini, "converse", lambda *a, **k: None)
-    monkeypatch.setattr(gemini, "classify", lambda q: ("status", "deterministic"))
     resp = answers.agent_turn("sunsari", "where is the shelter", None, "es")
     assert resp.mode == "deterministic"
     assert resp.language == "en"

@@ -7,13 +7,16 @@ deterministic no-instruction answer.
 
 from __future__ import annotations
 
+import logging
 import uuid
 
 from ..fixtures import areas as fx
 from ..schemas.chat import AssistantResponse
-from ..schemas.common import InstructionType
+from ..schemas.common import InstructionType, VerificationState
 from ..schemas.instructions import PublishedInstruction
 from . import cache, gemini, memory, reports as reports_svc, road_status
+
+log = logging.getLogger(__name__)
 
 AUTHORITY_LINE = "Contact your local emergency authority for anything not covered here."
 
@@ -78,6 +81,9 @@ _RENDERERS = {
 }
 
 
+_EXCLUDED_STATES = {VerificationState.duplicate, VerificationState.false_report}
+
+
 def build_context(area_id: str) -> str:
     """Compose the government context block fed to the agent."""
     a = fx.get_area(area_id) or {}
@@ -112,11 +118,15 @@ def build_context(area_id: str) -> str:
     closed = [r["name"] for r in a.get("roads", []) if r.get("status") == "closed"]
     if closed:
         lines.append("Known closed roads: " + ", ".join(closed) + ".")
-    recent = reports_svc.list_reports(area_id=area_id, limit=5)
+    recent = [
+        r
+        for r in reports_svc.list_reports(area_id=area_id, limit=10)
+        if r.verification_state not in _EXCLUDED_STATES
+    ][:5]
     if recent:
         lines.append("Recent UNVERIFIED community reports (do not treat as official):")
         for r in recent:
-            lines.append(f"  - {r.kind.value}: {r.message}")
+            lines.append(f"  - {r.kind.value}: {memory._clean(r.message, 200)}")
     return "\n".join(lines)
 
 
@@ -154,8 +164,7 @@ def agent_turn(
         remember = bool(reply) and turn.get("intent") != "off_topic"
     else:
         # Fallback: deterministic reply + keyword event extraction (English only).
-        topic, _ = gemini.classify(question)
-        reply = _render_text(area_id, topic, inst)
+        reply = _render_text(area_id, gemini.classify_keyword(question), inst)
         event_type = gemini.detect_event_keyword(question)
         summary = question.strip()
         language = "en"  # the fallback reply is English, whatever the hint says
@@ -178,7 +187,8 @@ def agent_turn(
                 SubmitReportRequest(
                     area_id=area_id,
                     kind=ReportKind(event_type),
-                    message=summary or f"{event_type} reported via agent call",
+                    message=((summary or question).strip()[:1000])
+                    or f"{event_type} reported via agent call",
                     location=GeoPoint(coordinates=[lng, lat]),
                     device_id=device_id,
                 )
@@ -187,6 +197,7 @@ def agent_turn(
             report_id = report.report_id
             report_kind = report.kind.value
         except Exception as e:
+            log.exception("auto-file SOS failed")
             report_filed = False
             already_sent = getattr(e, "code", None) == "sos_already_sent"
 
@@ -300,41 +311,3 @@ def _render_text(area_id: str, topic: str, inst: PublishedInstruction | None) ->
     if topic == "unsupported":
         return f"That's outside what I can answer from the official instruction. {AUTHORITY_LINE}"
     return _RENDERERS.get(topic, _status_text)(inst)
-
-
-def render(area_id: str, topic: str, mode: str) -> AssistantResponse:
-    inst = cache.get_current(area_id)
-    response_id = str(uuid.uuid4())
-
-    if inst is None:
-        text = _no_instruction(area_id)
-        source = "no_instruction"
-        instruction_id = None
-        published_at = None
-    elif topic == "unsupported":
-        text = (
-            "That's outside what I can answer from the official instruction. "
-            f"{AUTHORITY_LINE}"
-        )
-        source = "published_instruction"
-        instruction_id = inst.publication_id
-        published_at = inst.published_at
-    else:
-        renderer = _RENDERERS.get(topic, _status_text)
-        text = renderer(inst)
-        source = "published_instruction"
-        instruction_id = inst.publication_id
-        published_at = inst.published_at
-
-    cache.remember_response(response_id, text)
-    return AssistantResponse(
-        response_id=response_id,
-        area_id=area_id,
-        text=text,
-        instruction_id=instruction_id,
-        instruction_published_at=published_at,
-        source=source,
-        mode=mode,
-        audio_available=True,
-        freshness=cache.freshness(area_id),
-    )

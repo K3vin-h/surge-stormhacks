@@ -37,8 +37,8 @@ def damage(payload: dict) -> DamageResult:
     try:
         b = base64.b64decode(before, validate=True)
         a = base64.b64decode(after, validate=True)
-    except (binascii.Error, ValueError):
-        raise validation_error("Images must be valid base64.")
+    except (binascii.Error, ValueError) as err:
+        raise validation_error("Images must be valid base64.") from err
     # Demo proxy for change: normalized byte-length delta. Not real damage.
     denom = max(len(b), len(a), 1)
     diff_fraction = abs(len(a) - len(b)) / denom

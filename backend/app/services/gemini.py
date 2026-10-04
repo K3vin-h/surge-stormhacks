@@ -22,12 +22,6 @@ from ..config import get_settings
 # either an AI Studio API key (x-goog-api-key) or an OAuth access token
 # (Authorization: Bearer) depending on the configured credential.
 GEMINI_BASE = "https://generativelanguage.googleapis.com/v1beta"
-_LAST_ERROR: str | None = None
-
-
-def last_error() -> str | None:
-    """Most recent Gemini call error (for diagnostics/health)."""
-    return _LAST_ERROR
 
 
 def _auth_headers() -> dict[str, str]:
@@ -43,11 +37,9 @@ def _generate(
     system: str | None = None,
     temperature: float = 0.3,
     max_tokens: int = 400,
-    json_mode: bool = False,
 ) -> str | None:
     """One call into Gemini via REST. Returns text, or None on any failure
     (so every caller degrades to its deterministic fallback)."""
-    global _LAST_ERROR
     s = get_settings()
     if not s.gemini_enabled:
         return None
@@ -68,18 +60,13 @@ def _generate(
             with httpx.Client(timeout=20.0) as client:
                 r = client.post(url, headers=headers, json=body)
             if r.status_code in (429, 503):
-                _LAST_ERROR = f"{r.status_code}: {r.text[:160]}"
-                time.sleep(0.6)
+                if attempt < 1:
+                    time.sleep(0.6)
                 continue
             r.raise_for_status()
             parts = r.json()["candidates"][0]["content"]["parts"]
-            _LAST_ERROR = None
             return "".join(p.get("text", "") for p in parts).strip() or None
-        except httpx.HTTPStatusError as e:
-            _LAST_ERROR = f"{e.response.status_code}: {e.response.text[:160]}"
-            return None
-        except Exception as e:  # network, parse, shape
-            _LAST_ERROR = str(e)[:160]
+        except Exception:  # HTTP status, network, parse, shape
             return None
     return None  # exhausted retries on 503/429
 
@@ -103,15 +90,6 @@ def _parse_json(text: str) -> dict | None:
                 return None
         return None
 
-
-ALLOWED_TOPICS = {
-    "status",
-    "shelter",
-    "route",
-    "roads_to_avoid",
-    "next_update",
-    "unsupported",
-}
 
 # Backend-owned safety prompt. Never accepted from the browser.
 SAFETY_PROMPT = (
@@ -193,23 +171,14 @@ INTENT_GUIDANCE = {
 }
 DEFAULT_INTENT = "general_safety"  # unknown label: still help, never refuse
 
-CLASSIFY_INSTRUCTION = (
-    "You are a strict intent classifier for a flood-emergency assistant. "
-    "Read the resident's question and choose exactly one topic from this set: "
-    "status, shelter, route, roads_to_avoid, next_update, unsupported. "
-    'Return ONLY compact JSON of the form {"topic": "<one_topic>"}. '
-    "Use 'unsupported' for anything outside these topics. Do not add other keys "
-    "or text."
-)
-
 _KEYWORDS = [
-    ("route", r"\b(route|evacuat|which way|where.*go|how.*(get|leave)|exit|escape)\b"),
+    ("route", r"\b(route|evacuat\w*|which way|where.*go|how.*(get|leave)|exit|escape)\b"),
     ("shelter", r"\b(shelter|where.*stay|safe place|refuge|camp)\b"),
     ("roads_to_avoid", r"\b(road|bridge|avoid|closed|blocked|underpass|detour)\b"),
     ("next_update", r"\b(next update|when.*update|how long|again|news)\b"),
     (
         "status",
-        r"\b(status|situation|what.*happening|summar|safe|danger|next action)\b",
+        r"\b(status|situation|what.*happening|summar\w*|safe|danger|next action)\b",
     ),
 ]
 
@@ -227,24 +196,24 @@ REPORT_KINDS = {"rescue_needed", "road_hazard", "rescue_seen"}
 # Keyword fallback for event extraction when Gemini is unavailable.
 # Presence-based (no proximity window): if the required word groups both
 # appear anywhere in the utterance, classify it.
-_WITNESS = r"\b(see|saw|seeing|someone|somebody|people|person|neighbou?r|kid|child|man|woman|family|they'?re)\b"
+_WITNESS = r"\b(see|saw|seeing|someone|somebody|people|person|neighbou?r|kids?|child|children|man|woman|family|mother|father|mom|dad|parents?|brother|sister|wife|husband|baby|they'?re)\b"
 _DANGER = (
     r"\b(stuck|trapped|stranded|drowning|swept|on the roof|injured|hurt|bleeding)\b"
 )
-_SELF = r"\b(i'?m|i am|we'?re|we are|me|my|us|our)\b"
-_SELF_DISTRESS = r"\b(trapped|stuck|stranded|drowning|rescue|injured|hurt|bleeding|dying|can'?t get out|save us|save me|help us|help me)\b"
+_SELF_STATE = r"\b(i'?m|i am|we'?re|we are)\b.{0,20}\b(trapped|stuck|stranded|drowning|injured|hurt|bleeding|dying)\b"
+_SELF_PHRASE = r"\b(help|save|rescue) (me|us)\b|\bcan'?t get out\b|\bneed (a )?rescue\b"
 _ROADWORD = r"\b(road|bridge|street|highway|underpass|path|route|lane)\b"
 _HAZARD = r"\b(blocked|closed|flooded|washed|collapsed|under ?water|impassable|cut off|submerged)\b"
 
 
 def detect_event_keyword(text: str) -> str:
     q = (text or "").lower()
+    # First-person distress wins over witness words ("trapped with my family").
+    if re.search(_SELF_STATE, q) or re.search(_SELF_PHRASE, q):
+        return "rescue_needed"
     # Witness report of someone else in danger.
     if re.search(_WITNESS, q) and re.search(_DANGER, q):
         return "rescue_seen"
-    # First-person distress.
-    if re.search(_SELF, q) and re.search(_SELF_DISTRESS, q):
-        return "rescue_needed"
     # Blocked/flooded road.
     if re.search(_ROADWORD, q) and re.search(_HAZARD, q):
         return "road_hazard"
@@ -331,7 +300,7 @@ def converse(
         '"summary": "", "language": "en"}'
     )
     text = _generate(
-        prompt, system=CONVERSE_SYSTEM, temperature=0.3, max_tokens=400, json_mode=True
+        prompt, system=CONVERSE_SYSTEM, temperature=0.3, max_tokens=400
     )
     data = _parse_json(text) if text else None
     if data is None:
@@ -398,38 +367,3 @@ def summarize_update(
         f"=== CURRENT OFFICIAL INSTRUCTION ===\n{context_text}\n=== END ==="
     )
     return _generate(prompt, system=SAFETY_PROMPT, temperature=0.2, max_tokens=200)
-
-
-def generate_advice(question: str, context_text: str) -> str | None:
-    """Grounded survival advice from Gemini (AI thinking + government context).
-
-    Returns None when Gemini is unavailable so the caller can fall back to the
-    deterministic renderer. The safety prompt is enforced as system instruction.
-    """
-    prompt = (
-        "You are a live disaster-relief assistant speaking to a resident on a "
-        "voice call. Use ONLY the official government context below plus general "
-        "safety reasoning. Ground every operational claim (shelter, route, roads) "
-        "in the context; never invent them.\n\n"
-        f"=== OFFICIAL GOVERNMENT CONTEXT ===\n{context_text}\n"
-        f"=== END CONTEXT ===\n\nResident says: {question}\n\n"
-        "Reply in 1-2 sentences of clear, calm, actionable guidance."
-    )
-    return _generate(prompt, system=SAFETY_PROMPT, temperature=0.3, max_tokens=250)
-
-
-def classify(question: str) -> tuple[str, str]:
-    """Return (topic, mode). mode is 'gemini_grounded' or 'deterministic'."""
-    text = _generate(
-        f"{CLASSIFY_INSTRUCTION}\n\nResident question: {question}",
-        system=SAFETY_PROMPT,
-        temperature=0.0,
-        json_mode=True,
-    )
-    data = _parse_json(text) if text else None
-    if data is None:
-        return classify_keyword(question), "deterministic"
-    topic = data.get("topic", "unsupported")
-    if not isinstance(topic, str) or topic not in ALLOWED_TOPICS:
-        topic = "unsupported"
-    return topic, "gemini_grounded"

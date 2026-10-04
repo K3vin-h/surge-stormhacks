@@ -17,7 +17,7 @@ from .db.bootstrap import ensure_schema
 from .db.seed import seed_samples
 from .errors import ApiError, api_error_handler, unhandled_error_handler
 from .routers import areas, chat, demo_models, government, health, public
-from .services import cache, instructions
+from .services import instructions
 
 log = logging.getLogger("surge")
 logging.basicConfig(level=logging.INFO)

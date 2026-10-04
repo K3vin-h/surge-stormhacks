@@ -91,7 +91,6 @@ def test_off_topic_label_never_suppresses_model_reported_emergency(monkeypatch, 
 
 
 def test_off_topic_label_never_refuses_keyword_distress(monkeypatch):
-    seen = {}
     monkeypatch.setattr(
         gemini,
         "_generate",

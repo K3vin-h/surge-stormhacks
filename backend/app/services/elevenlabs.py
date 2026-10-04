@@ -6,12 +6,15 @@ an explicit failure (it keeps the typed-chat path either way).
 """
 from __future__ import annotations
 
+import logging
+
 import httpx
 
 from ..config import get_settings
 from ..errors import unavailable
 
 STT_URL = "https://api.elevenlabs.io/v1/speech-to-text"
+log = logging.getLogger(__name__)
 TTS_URL = "https://api.elevenlabs.io/v1/text-to-speech/{voice_id}"
 
 
@@ -26,9 +29,13 @@ def transcribe(audio_bytes: bytes, content_type: str) -> str:
         with httpx.Client(timeout=60.0) as client:
             resp = client.post(STT_URL, headers=headers, data=data, files=files)
             resp.raise_for_status()
-            return resp.json().get("text", "").strip()
-    except httpx.HTTPError as e:
-        raise unavailable(f"Transcription failed: {e}")
+            text = resp.json().get("text")
+            if not isinstance(text, str):
+                raise ValueError("missing text in STT response")
+            return text.strip()
+    except (httpx.HTTPError, ValueError, AttributeError) as e:
+        log.warning("ElevenLabs transcription failed: %s", e)
+        raise unavailable("Transcription failed.") from e
 
 
 def synthesize(text: str) -> bytes:
@@ -52,4 +59,5 @@ def synthesize(text: str) -> bytes:
             resp.raise_for_status()
             return resp.content
     except httpx.HTTPError as e:
-        raise unavailable(f"Speech synthesis failed: {e}")
+        log.warning("ElevenLabs synthesis failed: %s", e)
+        raise unavailable("Speech synthesis failed.") from e
