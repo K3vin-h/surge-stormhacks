@@ -13,5 +13,6 @@ node_modules/
 *.db
 *.sqlite
 *.sqlite3
+backend/.demo-cleared
 .DS_Store
 Thumbs.db

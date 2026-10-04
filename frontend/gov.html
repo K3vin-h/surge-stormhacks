@@ -35,6 +35,8 @@
     .ep-shelter.designated { box-shadow: 0 0 0 4px rgba(184, 116, 47, .35), 0 3px 10px rgba(0, 0, 0, .22); border-color: var(--amber); }
     .ep-hospital { border-color: var(--red); }
     .ep-closure { border-color: var(--red); background: #fbecea; }
+    .ep-restricted { border-color: var(--orange); background: #f8efe4; }
+    .ep-openroad { border-color: var(--line-2); color: var(--ink-2); }
     .ep-road_hazard { border-color: var(--orange); }
     .ep-rescue_needed { border-color: #c0392b; animation: pulse 1.8s infinite; }
     .ep-rescue_seen { border-color: var(--violet); }
@@ -82,6 +84,15 @@
     /* Feed */
     .feed { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
     .feed-head { padding: 12px 12px 8px; flex: none; }
+    .feed-bar { display: flex; align-items: center; gap: 8px; }
+    .feed-bar .seg { flex: 1; min-width: 0; }
+    .reset {
+      flex: none; height: 32px; padding: 0 10px; border-radius: 10px; border: 1px solid var(--line-2);
+      background: transparent; color: var(--muted); font-size: 11.5px; font-weight: 650; white-space: nowrap;
+    }
+    .reset:hover { color: var(--red); border-color: #e3b2ac; background: var(--red-soft); }
+    .reset.armed { background: var(--red); border-color: var(--red); color: #fff; }
+    .reset:disabled { opacity: .6; }
     .seg { display: flex; padding: 3px; border-radius: 11px; background: rgba(70, 77, 64, .08); }
     .seg button { flex: 1; border: none; background: none; padding: 7px 8px; border-radius: 9px; font-size: 12.5px; font-weight: 500; color: var(--ink-2); display: inline-flex; justify-content: center; align-items: baseline; gap: 6px; }
     .seg button b { font-weight: 600; color: var(--muted); font-size: 11px; }
@@ -172,7 +183,6 @@
     .lt b { font-weight: 600; display: block; }
     .lt small { display: block; color: var(--muted); font-size: 11px; margin-top: 1px; }
     .lt .lg-route { width: 18px; }
-    .lt.masked { opacity: .45; }
     .zone-sw { width: 16px; height: 12px; border-radius: 3px; border: 1.5px dashed var(--red); background: rgba(163, 59, 50, .08); }
     .sw-toggle {
       appearance: none; -webkit-appearance: none; margin: 0; width: 30px; height: 18px; border-radius: 999px; flex: none;
@@ -335,9 +345,12 @@
 
     <section class="glass feed">
       <div class="feed-head">
-        <div class="seg" id="feedTabs">
-          <button data-f="reports" class="active">Reports <b id="nReports">—</b></button>
-          <button data-f="activity">Activity <b id="nEvents">—</b></button>
+        <div class="feed-bar">
+          <div class="seg" id="feedTabs">
+            <button data-f="reports" class="active">Reports <b id="nReports">—</b></button>
+            <button data-f="activity">Activity <b id="nEvents">—</b></button>
+          </div>
+          <button type="button" class="reset" id="resetBtn" title="Delete every report and official message">Reset</button>
         </div>
         <div class="kinds" id="kinds"></div>
       </div>
@@ -352,7 +365,7 @@
   <div class="legend-wrap">
     <div class="map-btns">
       <button class="glass key-btn" id="keyBtn" aria-expanded="false" aria-controls="legend"><span data-icon="map"></span>Layers</button>
-      <button class="glass key-btn" id="iconsBtn" type="button" aria-pressed="false" title="Show only routes and the area zone"><span data-icon="eye"></span><span id="iconsLbl">Hide icons</span></button>
+      <button class="glass key-btn" id="iconsBtn" type="button" aria-pressed="false" title="Hide shelters, hospitals, roads, and reports"><span data-icon="eye"></span><span id="iconsLbl">Hide icons</span></button>
       <button class="glass key-btn" type="button" data-planner aria-controls="planner"><span data-icon="route"></span>Route planner</button>
     </div>
     <div class="glass legend" id="legend" hidden>
@@ -462,43 +475,50 @@
       ["shelter", "🏠", "Shelters", ""],
       ["hospital", "➕", "Hospitals", ""],
       ["closure", "❌", "Closed roads", ""],
+      ["restricted", "🚧", "Restricted roads", ""],
+      ["openroad", "🛣️", "Open roads", ""],
       ["report", "🆘", "Open reports", "🆘 rescue · 🚧 road hazard · 👁️ person seen"],
       ["dismissed", "✅", "Dismissed cases", "Helped, duplicate or false reports"],
     ];
-    const ICON_LAYERS = ["shelter", "hospital", "closure", "report", "dismissed"];
-    const LAYER_DEFAULTS = { route: true, zone: true, shelter: true, hospital: true, closure: true, report: true, dismissed: false };
+    const PIN_LAYERS = ["shelter", "hospital", "closure", "restricted", "openroad", "report", "dismissed"];
+    const LAYER_DEFAULTS = {
+      route: true, zone: true, shelter: true, hospital: true,
+      closure: true, restricted: true, openroad: false, report: true, dismissed: false,
+    };
     const prefs = (() => {
       try { return { ...LAYER_DEFAULTS, ...JSON.parse(localStorage.getItem("surge.gov.layers") || "{}") }; }
       catch { return { ...LAYER_DEFAULTS }; }
     })();
-    state.iconsOff = localStorage.getItem("surge.gov.iconsOff") === "1";
 
     $("layerRows").innerHTML = LAYERS.map(([k, mark, label, sub]) => `
       <label class="lt" data-layer="${k}"><span class="le">${mark}</span>
         <span><b>${esc(label)}</b>${sub ? `<small>${esc(sub)}</small>` : ""}</span>
         <input class="sw-toggle" type="checkbox" data-layer="${k}" aria-label="Show ${esc(label.toLowerCase())}" /></label>`).join("");
 
+    function pinsHidden() {
+      return ["shelter", "hospital", "closure", "restricted", "report"].every((k) => !prefs[k]);
+    }
+    function saveLayers() {
+      localStorage.setItem("surge.gov.layers", JSON.stringify(prefs));
+    }
     function applyLayers() {
       Object.entries(groups).forEach(([k, g]) => {
-        const on = prefs[k] && !(state.iconsOff && ICON_LAYERS.includes(k));
-        if (on && !map.hasLayer(g)) g.addTo(map);
-        if (!on && map.hasLayer(g)) map.removeLayer(g);
+        const on = !!prefs[k];
+        if (on && map && !map.hasLayer(g)) g.addTo(map);
+        if (!on && map && map.hasLayer(g)) map.removeLayer(g);
       });
       $("layerRows").querySelectorAll(".lt").forEach((row) => {
-        const k = row.dataset.layer;
-        row.querySelector("input").checked = prefs[k];
-        row.classList.toggle("masked", state.iconsOff && ICON_LAYERS.includes(k));
+        row.querySelector("input").checked = !!prefs[row.dataset.layer];
       });
       groups.zone && groups.zone.eachLayer((l) => l.bringToBack && l.bringToBack());
-      $("iconsBtn").setAttribute("aria-pressed", String(state.iconsOff));
-      $("iconsLbl").textContent = state.iconsOff ? "Show icons" : "Hide icons";
-      $("layerNote").textContent = state.iconsOff ? "Icons hidden: showing routes and the area zone only." : "";
+      const hidden = pinsHidden();
+      $("iconsBtn").setAttribute("aria-pressed", String(hidden));
+      $("iconsLbl").textContent = hidden ? "Show icons" : "Hide icons";
+      $("layerNote").textContent = "";
     }
     function setPref(k, on) {
       prefs[k] = on;
-      if (on && ICON_LAYERS.includes(k)) state.iconsOff = false;
-      localStorage.setItem("surge.gov.layers", JSON.stringify(prefs));
-      localStorage.setItem("surge.gov.iconsOff", state.iconsOff ? "1" : "0");
+      saveLayers();
       applyLayers();
       if (k === "dismissed") renderFeed();
     }
@@ -506,8 +526,9 @@
       if (e.target.dataset.layer) setPref(e.target.dataset.layer, e.target.checked);
     });
     $("iconsBtn").onclick = () => {
-      state.iconsOff = !state.iconsOff;
-      localStorage.setItem("surge.gov.iconsOff", state.iconsOff ? "1" : "0");
+      const show = pinsHidden();
+      PIN_LAYERS.forEach((k) => { prefs[k] = show && k !== "dismissed" && k !== "openroad"; });
+      saveLayers();
       applyLayers();
     };
 
@@ -604,7 +625,7 @@
     }
 
     function emojiPin(kind, { dim = false, extra = "" } = {}) {
-      const emoji = { shelter: MARKERS.shelter, hospital: MARKERS.hospital, closure: MARKERS.closed_road }[kind] || reportEmoji(kind);
+      const emoji = { shelter: MARKERS.shelter, hospital: MARKERS.hospital, closure: MARKERS.closed_road, restricted: "🚧", openroad: "🛣️" }[kind] || reportEmoji(kind);
       return L.divIcon({
         html: `<div class="emoji-pin ep-${kind} ${dim ? "ep-dim" : ""} ${extra}">${emoji}</div>`,
         className: "map-pin-wrap", iconSize: [30, 30], iconAnchor: [15, 15], popupAnchor: [0, -15],
@@ -647,6 +668,43 @@
         <span><b>${sos.length}</b> ${sos.length === 1 ? "rescue request" : "rescue requests"}${open ? ` · ${open} new` : ""}</span>
         <span><b>${closed}</b>of ${detail.roads.length} roads closed</span>`;
     }
+
+    // ---------- Reset ----------
+    let resetArmed = false;
+    function disarmReset() {
+      resetArmed = false;
+      const btn = $("resetBtn");
+      btn.classList.remove("armed");
+      btn.textContent = "Reset";
+      btn.disabled = false;
+    }
+    $("resetBtn").onclick = async (e) => {
+      e.stopPropagation();
+      const btn = $("resetBtn");
+      if (!resetArmed) {
+        resetArmed = true;
+        btn.classList.add("armed");
+        btn.textContent = "Clear all?";
+        return;
+      }
+      btn.disabled = true;
+      btn.textContent = "Clearing…";
+      try {
+        await api("/api/government/reset", { method: "POST" });
+        state.mapSig = "";
+        state.reports = [];
+        if (state.dash) state.dash.events = [];
+        if (state.status) state.status.instruction = null;
+        disarmReset();
+        await refresh();
+      } catch (err) {
+        btn.disabled = false;
+        btn.textContent = "Try again";
+        btn.title = err.message;
+      }
+    };
+    document.addEventListener("click", () => { if (resetArmed) disarmReset(); });
+    document.addEventListener("keydown", (e) => { if (e.key === "Escape" && resetArmed) disarmReset(); });
 
     // ---------- Feed ----------
     const KINDS = [["all", "All"], ["rescue_needed", "🆘"], ["road_hazard", "🚧"], ["rescue_seen", "👁️"]];
@@ -745,7 +803,7 @@
         : { padding: [30, 30] };
     }
     function drawMap(mapData, detail, fit) {
-      const sig = JSON.stringify([mapData.current_instruction_id, mapData.reports, mapData.closed_roads, mapData.risk_level]);
+      const sig = JSON.stringify([mapData.current_instruction_id, mapData.reports, detail.roads, mapData.risk_level]);
       if (sig === state.mapSig && !fit) return;
       state.mapSig = sig;
       Object.values(groups).forEach((g) => g.clearLayers());
@@ -766,7 +824,10 @@
         `<b>🏠 ${esc(s.name)}</b><br>Capacity ${fmtNumber(s.capacity)}${s.id === designated ? "<br><b>Designated for evacuation</b>" : ""}`,
         { z: s.id === designated ? 500 : 0, extra: s.id === designated ? "designated" : "" }));
       detail.hospitals.forEach((h) => add("hospital", latLng(h.location), "hospital", `<b>➕ ${esc(h.name)}</b><br>Hospital`));
-      mapData.closed_roads.forEach((r) => add("closure", latLng(r.geometry), "closure", `<b>❌ ${esc(r.name)}</b><br>Closed road`));
+      const roadLayer = { closed: "closure", restricted: "restricted", open: "openroad" };
+      const roadLabel = { closed: "Closed road", restricted: "Restricted road", open: "Open road" };
+      detail.roads.forEach((r) => add(roadLayer[r.status] || "openroad", latLng(r.geometry), roadLayer[r.status] || "openroad",
+        `<b>${esc(r.name)}</b><br>${roadLabel[r.status] || esc(r.status)}`));
       mapData.reports.forEach((r) => {
         const done = isDone(r);
         markers[r.report_id] = add(done ? "dismissed" : "report", latLng(r.location), r.kind, reportPopup(r),
