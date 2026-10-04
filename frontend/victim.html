@@ -848,7 +848,7 @@
       $("agentStatus").textContent = label;
     }
 
-    let audio = null, ttsPending = 0, ttsGen = 0, pendingTts = null, audioUnlocked = false, lastObjUrl = null;
+    let audio = null, ttsPending = 0, ttsGen = 0, pendingTts = null, audioUnlocked = false, lastObjUrl = null, pendingPlaySrc = null;
 
     function ensureAudioEl() {
       if (!audio) audio = new Audio();
@@ -871,6 +871,20 @@
     }
     ["pointerdown", "keydown", "touchstart"].forEach((ev) =>
       window.addEventListener(ev, unlockAudio, { once: true, passive: true }));
+
+    // Safety net: if a clip (e.g. the first government update) was blocked by
+    // autoplay before any interaction, it's queued here and plays automatically
+    // on the very next tap anywhere — the user never has to hunt for a button.
+    function flushPendingPlay() {
+      if (!pendingPlaySrc) return;
+      const src = pendingPlaySrc;
+      pendingPlaySrc = null;
+      const a = ensureAudioEl();
+      a.src = src;
+      a.play().catch(() => {});
+    }
+    ["pointerdown", "keydown", "touchstart"].forEach((ev) =>
+      window.addEventListener(ev, flushPendingPlay, { passive: true }));
 
     async function playTts(payload, btn) {
       const gen = ++ttsGen;
@@ -895,8 +909,10 @@
         try {
           await a.play();
         } catch (_) {
-          // Autoplay blocked (no gesture yet). Point to the replay control.
-          toast("Tap the speaker icon to hear it.", { error: true });
+          // Autoplay blocked (no gesture yet). Queue it to play on the next
+          // tap anywhere, and also leave the replay button as a fallback.
+          pendingPlaySrc = lastObjUrl;
+          toast("Tap anywhere to hear the update.", { error: true });
         }
       } catch (_) {
       } finally {
