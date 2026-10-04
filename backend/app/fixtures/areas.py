@@ -44,21 +44,51 @@ AREAS: dict[str, dict[str, Any]] = {
              "capacity": 1200, "location": {"type": "Point", "coordinates": [87.201, 26.641]}},
             {"id": "inaruwa_stadium", "name": "Inaruwa Stadium",
              "capacity": 3000, "location": {"type": "Point", "coordinates": [87.150, 26.606]}},
+            {"id": "duhabi_secondary", "name": "Duhabi Secondary School",
+             "capacity": 800, "location": {"type": "Point", "coordinates": [87.232, 26.655]}},
+            {"id": "ramdhuni_hall", "name": "Ramdhuni Community Hall",
+             "capacity": 650, "location": {"type": "Point", "coordinates": [87.206, 26.598]}},
+            {"id": "jhumka_army_camp", "name": "Jhumka Army Camp Grounds",
+             "capacity": 2200, "location": {"type": "Point", "coordinates": [87.240, 26.615]}},
         ],
         "routes": [
             {"id": "east_canal_route", "name": "East Canal Evacuation Route",
              "geometry": {"type": "LineString", "coordinates": [
                  [87.182, 26.627], [87.195, 26.634], [87.201, 26.641]]}},
+            {"id": "inaruwa_west_bypass", "name": "Inaruwa West Bypass",
+             "geometry": {"type": "LineString", "coordinates": [
+                 [87.182, 26.627], [87.168, 26.618], [87.150, 26.606]]}},
+            {"id": "duhabi_north_corridor", "name": "Duhabi North Corridor",
+             "geometry": {"type": "LineString", "coordinates": [
+                 [87.182, 26.627], [87.208, 26.643], [87.232, 26.655]]}},
+            {"id": "ramdhuni_south_link", "name": "Ramdhuni South Link",
+             "geometry": {"type": "LineString", "coordinates": [
+                 [87.182, 26.627], [87.196, 26.611], [87.206, 26.598]]}},
+            {"id": "jhumka_highway_east", "name": "Jhumka Highway East",
+             "geometry": {"type": "LineString", "coordinates": [
+                 [87.182, 26.627], [87.212, 26.622], [87.240, 26.615]]}},
         ],
         "roads": [
             {"id": "mahendra_underpass", "name": "Mahendra Highway Underpass", "status": "closed",
              "geometry": {"type": "Point", "coordinates": [87.170, 26.620]}},
             {"id": "koshi_bridge", "name": "Koshi Barrage Bridge", "status": "open",
              "geometry": {"type": "Point", "coordinates": [87.155, 26.612]}},
+            {"id": "sapta_koshi_embankment", "name": "Sapta Koshi Embankment Road", "status": "closed",
+             "geometry": {"type": "Point", "coordinates": [87.158, 26.641]}},
+            {"id": "inaruwa_bazaar_road", "name": "Inaruwa Bazaar Road", "status": "restricted",
+             "geometry": {"type": "Point", "coordinates": [87.146, 26.603]}},
+            {"id": "budhi_khola_ford", "name": "Budhi Khola Ford", "status": "closed",
+             "geometry": {"type": "Point", "coordinates": [87.214, 26.633]}},
+            {"id": "dharan_link_road", "name": "Dharan Link Road", "status": "open",
+             "geometry": {"type": "Point", "coordinates": [87.228, 26.666]}},
         ],
         "hospitals": [
             {"id": "koshi_hospital", "name": "Koshi Hospital",
              "location": {"type": "Point", "coordinates": [87.164, 26.633]}},
+            {"id": "inaruwa_district_hospital", "name": "Inaruwa District Hospital",
+             "location": {"type": "Point", "coordinates": [87.143, 26.611]}},
+            {"id": "duhabi_health_post", "name": "Duhabi Health Post",
+             "location": {"type": "Point", "coordinates": [87.226, 26.650]}},
         ],
     },
     "saptari": {
@@ -80,19 +110,44 @@ AREAS: dict[str, dict[str, Any]] = {
         "shelters": [
             {"id": "rajbiraj_highschool", "name": "Rajbiraj High School",
              "capacity": 900, "location": {"type": "Point", "coordinates": [86.745, 26.538]}},
+            {"id": "kanchanpur_campus", "name": "Kanchanpur Campus Hall",
+             "capacity": 1100, "location": {"type": "Point", "coordinates": [87.030, 26.640]}},
+            {"id": "bhardaha_school", "name": "Bhardaha Secondary School",
+             "capacity": 700, "location": {"type": "Point", "coordinates": [86.968, 26.592]}},
+            {"id": "shambhunath_temple_grounds", "name": "Shambhunath Temple Grounds",
+             "capacity": 1800, "location": {"type": "Point", "coordinates": [87.015, 26.660]}},
         ],
         "routes": [
             {"id": "rajbiraj_ring", "name": "Rajbiraj Ring Road Route",
              "geometry": {"type": "LineString", "coordinates": [
                  [86.998, 26.616], [86.870, 26.575], [86.745, 26.538]]}},
+            {"id": "kanchanpur_east_road", "name": "Kanchanpur East Road",
+             "geometry": {"type": "LineString", "coordinates": [
+                 [86.998, 26.616], [87.014, 26.628], [87.030, 26.640]]}},
+            {"id": "bhardaha_canal_path", "name": "Bhardaha Canal Path",
+             "geometry": {"type": "LineString", "coordinates": [
+                 [86.998, 26.616], [86.984, 26.604], [86.968, 26.592]]}},
+            {"id": "shambhunath_highland_route", "name": "Shambhunath Highland Route",
+             "geometry": {"type": "LineString", "coordinates": [
+                 [86.998, 26.616], [87.006, 26.640], [87.015, 26.660]]}},
         ],
         "roads": [
             {"id": "khado_culvert", "name": "Khado River Culvert", "status": "closed",
              "geometry": {"type": "Point", "coordinates": [86.930, 26.600]}},
+            {"id": "koshi_east_embankment", "name": "Koshi East Embankment", "status": "closed",
+             "geometry": {"type": "Point", "coordinates": [87.040, 26.610]}},
+            {"id": "rajbiraj_market_road", "name": "Rajbiraj Market Road", "status": "restricted",
+             "geometry": {"type": "Point", "coordinates": [86.985, 26.622]}},
+            {"id": "mahendra_highway_saptari", "name": "Mahendra Highway (Kanchanpur)", "status": "open",
+             "geometry": {"type": "Point", "coordinates": [87.022, 26.650]}},
+            {"id": "trijuga_bridge", "name": "Trijuga River Bridge", "status": "closed",
+             "geometry": {"type": "Point", "coordinates": [86.975, 26.635]}},
         ],
         "hospitals": [
             {"id": "gajendra_hospital", "name": "Gajendra Narayan Singh Hospital",
              "location": {"type": "Point", "coordinates": [86.748, 26.543]}},
+            {"id": "kanchanpur_health_centre", "name": "Kanchanpur Primary Health Centre",
+             "location": {"type": "Point", "coordinates": [87.026, 26.645]}},
         ],
     },
     "bardiya": {
@@ -114,19 +169,42 @@ AREAS: dict[str, dict[str, Any]] = {
         "shelters": [
             {"id": "gulariya_campus", "name": "Gulariya Multiple Campus",
              "capacity": 1500, "location": {"type": "Point", "coordinates": [81.345, 28.206]}},
+            {"id": "rajapur_school", "name": "Rajapur Secondary School",
+             "capacity": 950, "location": {"type": "Point", "coordinates": [81.400, 28.330]}},
+            {"id": "thakurdwara_hall", "name": "Thakurdwara Community Hall",
+             "capacity": 600, "location": {"type": "Point", "coordinates": [81.470, 28.320]}},
+            {"id": "bansgadhi_stadium", "name": "Bansgadhi Stadium",
+             "capacity": 2000, "location": {"type": "Point", "coordinates": [81.455, 28.270]}},
         ],
         "routes": [
             {"id": "gulariya_route", "name": "Gulariya Highland Route",
              "geometry": {"type": "LineString", "coordinates": [
                  [81.433, 28.300], [81.390, 28.250], [81.345, 28.206]]}},
+            {"id": "rajapur_west_road", "name": "Rajapur West Road",
+             "geometry": {"type": "LineString", "coordinates": [
+                 [81.433, 28.300], [81.418, 28.316], [81.400, 28.330]]}},
+            {"id": "thakurdwara_park_road", "name": "Thakurdwara Park Road",
+             "geometry": {"type": "LineString", "coordinates": [
+                 [81.433, 28.300], [81.452, 28.311], [81.470, 28.320]]}},
+            {"id": "bansgadhi_east_link", "name": "Bansgadhi East Link",
+             "geometry": {"type": "LineString", "coordinates": [
+                 [81.433, 28.300], [81.445, 28.285], [81.455, 28.270]]}},
         ],
         "roads": [
             {"id": "babai_bridge", "name": "Babai River Bridge", "status": "open",
              "geometry": {"type": "Point", "coordinates": [81.410, 28.270]}},
+            {"id": "karnali_levee_road", "name": "Karnali Levee Road", "status": "closed",
+             "geometry": {"type": "Point", "coordinates": [81.395, 28.315]}},
+            {"id": "orahi_khola_crossing", "name": "Orahi Khola Crossing", "status": "closed",
+             "geometry": {"type": "Point", "coordinates": [81.442, 28.292]}},
+            {"id": "gulariya_bazaar_road", "name": "Gulariya Bazaar Road", "status": "restricted",
+             "geometry": {"type": "Point", "coordinates": [81.352, 28.215]}},
         ],
         "hospitals": [
             {"id": "bardiya_hospital", "name": "Bardiya District Hospital",
              "location": {"type": "Point", "coordinates": [81.348, 28.210]}},
+            {"id": "rajapur_health_post", "name": "Rajapur Health Post",
+             "location": {"type": "Point", "coordinates": [81.405, 28.325]}},
         ],
     },
     "kathmandu_valley": {
@@ -148,19 +226,51 @@ AREAS: dict[str, dict[str, Any]] = {
         "shelters": [
             {"id": "tudikhel_ground", "name": "Tundikhel Open Ground",
              "capacity": 5000, "location": {"type": "Point", "coordinates": [85.316, 27.701]}},
+            {"id": "maharajgunj_campus", "name": "Maharajgunj Campus Grounds",
+             "capacity": 2500, "location": {"type": "Point", "coordinates": [85.330, 27.735]}},
+            {"id": "patan_durbar_square", "name": "Patan Durbar Square Shelter",
+             "capacity": 1800, "location": {"type": "Point", "coordinates": [85.325, 27.673]}},
+            {"id": "bhaktapur_stadium", "name": "Bhaktapur Stadium",
+             "capacity": 3200, "location": {"type": "Point", "coordinates": [85.390, 27.676]}},
+            {"id": "swayambhu_hill", "name": "Swayambhu Hill Assembly Point",
+             "capacity": 1400, "location": {"type": "Point", "coordinates": [85.290, 27.715]}},
         ],
         "routes": [
             {"id": "ring_road_north", "name": "Ring Road North Evacuation",
              "geometry": {"type": "LineString", "coordinates": [
                  [85.324, 27.709], [85.330, 27.730], [85.340, 27.745]]}},
+            {"id": "kantipath_route", "name": "Kantipath to Tundikhel",
+             "geometry": {"type": "LineString", "coordinates": [
+                 [85.324, 27.709], [85.318, 27.705], [85.316, 27.701]]}},
+            {"id": "patan_south_route", "name": "Patan South Corridor",
+             "geometry": {"type": "LineString", "coordinates": [
+                 [85.324, 27.709], [85.328, 27.690], [85.325, 27.673]]}},
+            {"id": "araniko_east_route", "name": "Araniko Highway East",
+             "geometry": {"type": "LineString", "coordinates": [
+                 [85.324, 27.709], [85.355, 27.690], [85.390, 27.676]]}},
+            {"id": "swayambhu_west_route", "name": "Swayambhu West Climb",
+             "geometry": {"type": "LineString", "coordinates": [
+                 [85.324, 27.709], [85.305, 27.712], [85.290, 27.715]]}},
         ],
         "roads": [
             {"id": "bagmati_bridge", "name": "Bagmati Bridge (Thapathali)", "status": "closed",
              "geometry": {"type": "Point", "coordinates": [85.317, 27.693]}},
+            {"id": "teku_road", "name": "Teku Riverside Road", "status": "closed",
+             "geometry": {"type": "Point", "coordinates": [85.305, 27.695]}},
+            {"id": "bishnumati_link", "name": "Bishnumati Link Road", "status": "restricted",
+             "geometry": {"type": "Point", "coordinates": [85.298, 27.708]}},
+            {"id": "sinamangal_road", "name": "Sinamangal Airport Road", "status": "open",
+             "geometry": {"type": "Point", "coordinates": [85.350, 27.698]}},
+            {"id": "manohara_bridge", "name": "Manohara Bridge", "status": "closed",
+             "geometry": {"type": "Point", "coordinates": [85.365, 27.690]}},
         ],
         "hospitals": [
             {"id": "bir_hospital", "name": "Bir Hospital",
              "location": {"type": "Point", "coordinates": [85.313, 27.704]}},
+            {"id": "teaching_hospital", "name": "Tribhuvan University Teaching Hospital",
+             "location": {"type": "Point", "coordinates": [85.332, 27.736]}},
+            {"id": "patan_hospital", "name": "Patan Hospital",
+             "location": {"type": "Point", "coordinates": [85.319, 27.668]}},
         ],
     },
 }

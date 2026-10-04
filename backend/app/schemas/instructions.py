@@ -68,7 +68,7 @@ class Alert(BaseModel):
 
 class GovEvent(BaseModel):
     event_id: str
-    kind: str  # publication | model_refresh | road_closure | distress_report
+    kind: str  # publication | model_refresh | road_closure | distress_report | report_update
     area_id: AreaId | None = None
     summary: str
     created_at: datetime

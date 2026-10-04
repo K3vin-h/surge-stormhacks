@@ -6,22 +6,24 @@ stay here.
 
 ## Run
 
-From the repo root (the venv and `.env` live there):
+From the repo root. `.env` is optional; see `.env.example`.
 
 ```bash
-source .venv/Scripts/activate           # Windows Git Bash
-pip install -r backend/requirements.txt
-cd backend
-uvicorn app.main:app --reload --host 127.0.0.1 --port 8008
+python -m venv .venv
+.venv/Scripts/python -m pip install -r backend/requirements.txt
+.venv/Scripts/python -m uvicorn app.main:app --app-dir backend --host 127.0.0.1 --port 8008
 ```
 
-Point `API_PROXY_TARGET` (Next.js) at `http://127.0.0.1:8008`.
+On macOS or Linux, use `.venv/bin/python` instead of `.venv/Scripts/python`.
+
+Without Snowflake settings, startup creates `backend/local.db` and seeds it from `app/db/seed.py` when the tables are empty. That file stays on the machine that is running the server and is not committed. Published directives and dismissed cases are stored there until a Snowflake account is configured.
 
 ## What it does
 
-- **Snowflake (durable):** published instructions, community reports, gov events.
+- **Snowflake (optional):** published instructions, community reports, gov events.
   Tables auto-created on startup (`app/db/bootstrap.py`). Key-pair auth via
-  `rsa_key.p8`.
+  `rsa_key.p8`. If the account, user, or key file is missing, the same tables
+  are stored in local SQLite instead.
 - **Fast read cache:** latest instruction per area, hydrated from Snowflake on
   startup, updated synchronously after each publish. This is what resident
   polling (`/api/public/status/{area_id}`) reads every 3s.

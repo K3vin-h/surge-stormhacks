@@ -3,19 +3,50 @@
 A single lazily-created connection is reused across requests and
 re-established if it drops. JSON columns are stored as TEXT and
 (de)serialized in Python to avoid PARSE_JSON binding friction.
+
+When Snowflake is not configured (no account or private key), the same
+interface is served by a local SQLite file so the app runs for local dev.
 """
 from __future__ import annotations
 
+import logging
+import sqlite3
 import threading
+from datetime import datetime
 from typing import Any, Sequence
 
 import snowflake.connector
 from cryptography.hazmat.primitives import serialization
 
-from ..config import get_settings
+from ..config import REPO_ROOT, get_settings
+
+log = logging.getLogger("surge.db")
 
 _lock = threading.Lock()
 _conn: snowflake.connector.SnowflakeConnection | None = None
+
+LOCAL_DB_PATH = REPO_ROOT / "backend" / "local.db"
+_local: sqlite3.Connection | None = None
+sqlite3.register_adapter(datetime, lambda d: d.isoformat())
+
+
+def snowflake_configured() -> bool:
+    s = get_settings()
+    key = s.sf_private_key_abs
+    return bool(s.sf_account and s.sf_user and key and key.exists())
+
+
+def _local_conn() -> sqlite3.Connection:
+    global _local
+    if _local is None:
+        log.warning("Snowflake not configured; using local SQLite store at %s", LOCAL_DB_PATH)
+        _local = sqlite3.connect(LOCAL_DB_PATH, check_same_thread=False)
+        _local.row_factory = sqlite3.Row
+    return _local
+
+
+def _local_sql(sql: str) -> str:
+    return sql.replace("%s", "?")
 
 
 def _load_private_key_der() -> bytes:
@@ -55,6 +86,12 @@ def get_connection() -> snowflake.connector.SnowflakeConnection:
 
 
 def execute(sql: str, params: Sequence[Any] | None = None) -> None:
+    if not snowflake_configured():
+        with _lock:
+            conn = _local_conn()
+            conn.execute(_local_sql(sql), list(params or []))
+            conn.commit()
+        return
     conn = get_connection()
     with _lock:
         cur = conn.cursor()
@@ -65,6 +102,10 @@ def execute(sql: str, params: Sequence[Any] | None = None) -> None:
 
 
 def query(sql: str, params: Sequence[Any] | None = None) -> list[dict[str, Any]]:
+    if not snowflake_configured():
+        with _lock:
+            rows = _local_conn().execute(_local_sql(sql), list(params or [])).fetchall()
+        return [dict(r) for r in rows]
     conn = get_connection()
     with _lock:
         cur = conn.cursor(snowflake.connector.DictCursor)

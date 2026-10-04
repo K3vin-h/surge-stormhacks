@@ -12,9 +12,9 @@ npm ci
 npm run serve
 ```
 
-Open **http://127.0.0.1:3010/rasuwa/**. The SURGE home page also links to the planner. `npm ci` copies the pinned MapLibre distribution, worker, shared module, CSS, and license into the ignored `vendor/` directory. No bundler or Next.js server is needed. Do not open the HTML as a `file://` URL: browser module and data fetching require HTTP.
+Open **http://127.0.0.1:3010/rasuwa/**. The SURGE home page also links to the planner. The pinned MapLibre files are committed in `vendor/`, so a clone can open the planner without `npm ci`. Running `npm ci` refreshes that folder from the pinned `maplibre-gl` version. No bundler or Next.js server is needed. Do not open the HTML as a `file://` URL: browser module and data fetching require HTTP.
 
-The existing SURGE backend already serves `frontend/` as static files. Once `npm ci` has prepared the assets, `/rasuwa/` can also be opened on that existing server. Local routing makes **no `/api/` requests** until **Connect government API** is clicked. On the backend server, that button loads ranked areas, current directives, operational events, and reports, and enables publishing and model refresh. The API areas are Sunsari, Saptari, Bardiya, and Kathmandu Valley; they are explicitly separate from the Rasuwa geographic map. A static-only server shows an unavailable status for government operations while local routing continues.
+The existing SURGE backend already serves `frontend/` as static files, including `vendor/`, so `/rasuwa/` works on that server immediately. Local routing makes **no `/api/` requests** until **Connect government API** is clicked. On the backend server, that button loads ranked areas, current directives, operational events, and reports, and enables publishing and model refresh. The API areas are Sunsari, Saptari, Bardiya, and Kathmandu Valley; they are explicitly separate from the Rasuwa geographic map. A static-only server shows an unavailable status for government operations while local routing continues.
 
 For any static deployment, publish `frontend/` with the generated `rasuwa/vendor/` assets included. Do not deploy just the HTML page or omit its modules/data. Existing government/resident pages still require their existing backend; this standalone serving command is specifically for the new planner.
 

@@ -2,153 +2,483 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0d1511" />
   <title>SURGE — Resident</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <link rel="stylesheet" href="theme.css?v=brand3" />
   <style>
-    * { box-sizing: border-box; }
-    body { font-family: system-ui, sans-serif; margin: 0; background: #0b1220; color: #e6edf3; }
-    .phone { max-width: 430px; margin: 0 auto; min-height: 100vh; border-left: 1px solid #22304a; border-right: 1px solid #22304a; }
-    header { padding: 10px 14px; background: #121b2e; display: flex; align-items: center; gap: 10px; }
-    header h1 { font-size: 16px; margin: 0; }
-    select { margin-left: auto; background: #0b1220; color: #e6edf3; border: 1px solid #22304a; border-radius: 6px; padding: 5px; }
-    .section { padding: 12px 14px; }
-    .banner { border-radius: 10px; padding: 12px; margin: 12px 14px; }
-    .b-critical { background: #7f1d1d; } .b-warning { background: #9a3412; }
-    .b-advisory { background: #854d0e; } .b-info { background: #14532d; } .b-none { background: #1f2a3d; }
-    .banner .t { font-weight: 700; font-size: 15px; }
-    #map { height: 240px; margin: 0 14px; border-radius: 10px; }
-    .row { display: flex; gap: 8px; }
-    button { font: inherit; border: none; border-radius: 8px; padding: 10px; cursor: pointer; }
-    .call { background: #22c55e; color: #042; flex: 1; font-weight: 700; }
-    .call.recording { background: #ef4444; color: white; }
-    .brief { background: #4b7bec; color: white; flex: 1; font-weight: 700; }
-    .chatbox { background: #121b2e; border: 1px solid #22304a; border-radius: 10px; padding: 10px; min-height: 60px; }
-    .msg { margin: 6px 0; } .msg .who { font-size: 11px; color: #9fb0c3; }
-    .msg .txt { background: #0e1830; padding: 8px; border-radius: 8px; }
-    input[type=text] { flex: 1; padding: 10px; background: #0b1220; color: #e6edf3; border: 1px solid #22304a; border-radius: 8px; }
-    .report-btns button { flex: 1; font-size: 13px; }
-    .r-road { background: #f59e0b; color: #222; }
-    .r-sos { background: #ef4444; color: white; }
-    .r-seen { background: #8b5cf6; color: white; }
-    .muted { color: #6b7a90; font-size: 12px; }
-    .ok { color: #4ade80; } .err { color: #f87171; }
-    h3 { font-size: 13px; color: #9fb0c3; text-transform: uppercase; letter-spacing: .04em; margin: 4px 0 8px; }
+    html, body { height: 100%; }
+    body { background: #0a110d; overflow: hidden; overscroll-behavior: none; -webkit-tap-highlight-color: transparent; }
+    .app {
+      position: relative; display: flex; flex-direction: column; overflow: hidden; background: var(--bg);
+      width: 100%; max-width: 480px; height: 100vh; height: 100dvh; margin: 0 auto;
+    }
+    @media (min-width: 481px) { .app { box-shadow: 0 0 0 1px #2c3626, 0 0 60px rgba(0, 0, 0, .5); } }
+
+    .app-head {
+      flex: none; display: flex; align-items: center; justify-content: space-between;
+      padding: calc(12px + env(safe-area-inset-top)) 18px 14px; color: #e3e6da;
+      background: linear-gradient(90deg, rgba(13, 21, 17, .96) 30%, rgba(13, 21, 17, .7)), url("assets/brand/hero-dark.jpg") 100% 0% / 200% auto no-repeat, #0d1511;
+    }
+    .app-head .brand { display: flex; align-items: center; gap: 10px; }
+    .app-head .brand .emblem { width: 32px; height: 32px; }
+    .app-head .name { font-size: 18px; color: #f2f1e8; display: flex; }
+    .bell {
+      position: relative; width: 42px; height: 42px; border-radius: 50%; display: grid; place-items: center;
+      background: rgba(255, 255, 255, .08); border: 1px solid rgba(255, 255, 255, .12); color: #e3e6da;
+    }
+    .bell .ndot, .tabbar .ndot { position: absolute; top: 8px; right: 9px; width: 8px; height: 8px; border-radius: 50%; background: #d39a3e; box-shadow: 0 0 0 2px #0d1511; }
+    .ndot[hidden] { display: none; }
+
+    .screen { position: relative; flex: 1; min-height: 0; }
+    .tab { position: absolute; inset: 0; overflow-y: auto; padding: 16px 18px 28px; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; }
+    .tab[hidden] { display: none; }
+
+    .tabbar {
+      flex: none; display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; padding: 8px 10px calc(10px + env(safe-area-inset-bottom));
+      background: var(--surface); border-top: 1px solid var(--line);
+    }
+    .tabbar button {
+      position: relative; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 10px 4px;
+      border: 2px solid transparent; border-radius: 16px; background: none; color: var(--muted); font-size: 12px; font-weight: 500;
+    }
+    .tabbar button.active { background: var(--sage); color: var(--ink); font-weight: 700; }
+    .tabbar button:focus-visible { border-color: var(--amber-2); outline: none; }
+    .tabbar .ndot { top: 6px; right: calc(50% - 16px); background: var(--red); box-shadow: 0 0 0 2px var(--surface); }
+
+    /* Home */
+    .greet { color: var(--ink-2); margin-top: 20px; font-size: 15px; }
+    .home h1 { font-size: 31px; line-height: 1.08; margin: 4px 0 18px; letter-spacing: -0.03em; }
+    .area-card {
+      position: relative; background: var(--surface); border: 1px solid var(--line-2); border-radius: 16px; padding: 12px 18px;
+      box-shadow: var(--shadow);
+    }
+    .area-card .eyebrow { font-size: 10px; color: var(--muted); }
+    .area-card .val { display: flex; justify-content: space-between; align-items: center; font-size: 18px; font-weight: 600; margin-top: 2px; }
+    .area-card select { position: absolute; inset: 0; opacity: 0; width: 100%; cursor: pointer; font-size: 16px; }
+    .area-card .change { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; font-weight: 600; color: var(--forest-3); }
+    .area-hint { font-size: 12px; color: var(--muted); margin-top: 2px; }
+    .area-card.needs-pick { border: 2px solid var(--amber-2); padding: 11px 17px; background: var(--amber-soft); }
+    .area-card.needs-pick .area-hint { color: var(--amber); font-weight: 600; }
+    .inst {
+      position: relative; overflow: hidden; margin-top: 16px; border-radius: 22px; padding: 22px 22px 18px 24px;
+      color: #f2f1e8; box-shadow: var(--shadow-lg);
+      background: linear-gradient(165deg, rgba(17, 28, 22, .9), rgba(13, 21, 17, .76)), url("assets/brand/hero-dark.jpg") 0% 100% / 420% auto no-repeat, #0d1511;
+    }
+    .inst::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 5px; background: var(--amber-2); }
+    .inst.clear { background: linear-gradient(165deg, rgba(31, 49, 37, .88), rgba(20, 32, 25, .72)), url("assets/brand/hero-dark.jpg") 0% 100% / 420% auto no-repeat, #1f3125; }
+    .inst.clear::before { background: var(--brand-sage-2); }
+    .inst.none { background: var(--surface); color: var(--ink); border: 1px solid var(--line); box-shadow: var(--shadow); }
+    .inst.none::before { background: var(--line-2); }
+    .inst-top { display: flex; justify-content: space-between; align-items: center; font-size: 11.5px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }
+    .inst-top span:first-child { display: flex; align-items: center; gap: 8px; opacity: .9; }
+    .inst-cur { font-size: 10.5px; letter-spacing: .04em; padding: 5px 10px; border-radius: 999px; background: rgba(255, 255, 255, .14); }
+    .inst h2 { font-size: 34px; margin: 18px 0 8px; letter-spacing: -0.02em; }
+    .inst p { margin: 0; font-size: 15px; line-height: 1.5; opacity: .92; }
+    .inst-go { margin-top: 14px; display: grid; gap: 8px; }
+    .inst-go div { display: flex; gap: 10px; align-items: center; padding: 10px 12px; border-radius: 12px; background: rgba(255, 255, 255, .08); font-size: 13px; }
+    .inst-go b { display: block; }
+    .inst-go small { opacity: .7; }
+    .inst-foot { margin-top: 16px; display: flex; justify-content: space-between; align-items: center; font-size: 11.5px; opacity: .85; }
+    .listen {
+      display: inline-flex; align-items: center; gap: 7px; padding: 8px 14px; border-radius: 999px; font-size: 13px; font-weight: 600;
+      background: rgba(255, 255, 255, .12); border: 1px solid rgba(255, 255, 255, .22); color: inherit;
+    }
+    .inst.none .listen, .alert-card .listen { background: var(--surface-2); border-color: var(--line-2); color: var(--forest-2); }
+    .meta-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
+    .meta { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; }
+    .meta .eyebrow { font-size: 9.5px; color: var(--muted); margin-bottom: 6px; }
+    .meta b { font-size: 15px; }
+    .sec-title { display: flex; justify-content: space-between; align-items: baseline; margin: 26px 0 10px; }
+    .sec-title h3 { font-size: 17px; }
+    .acts { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .act {
+      display: flex; align-items: center; gap: 12px; padding: 14px; border-radius: 16px; border: 1px solid var(--line);
+      background: var(--surface); text-align: left; font-weight: 600; font-size: 13.5px; box-shadow: var(--shadow);
+    }
+    .act .ai { width: 38px; height: 38px; border-radius: 12px; display: grid; place-items: center; flex: none; }
+    .act small { display: block; font-weight: 400; color: var(--muted); font-size: 11.5px; }
+    .act.sos { grid-column: 1 / -1; background: var(--red); border-color: var(--red); color: #fff; }
+    .act.sos .ai { background: rgba(255, 255, 255, .16); }
+    .act.sos small { color: rgba(255, 255, 255, .8); }
+    .act:disabled { opacity: .6; }
+    #reportMsg { margin-top: 10px; font-size: 13px; }
+    .ask {
+      margin-top: 22px; display: flex; align-items: center; gap: 14px; width: 100%; text-align: left; padding: 16px; border-radius: 18px;
+      background: var(--forest-2); color: #eef0e7; border: none; box-shadow: var(--shadow-lg);
+    }
+    .ask .ai { width: 42px; height: 42px; border-radius: 14px; background: rgba(255, 255, 255, .1); display: grid; place-items: center; }
+    .ask b { display: block; font-size: 15px; }
+    .ask small { opacity: .75; }
+
+    /* Map tab */
+    #tab-map { padding: 0; overflow: hidden; }
+    #map { position: absolute; inset: 0; z-index: 0; }
+    .attrib { font-size: 10.5px; color: var(--muted); text-align: center; padding-top: 10px; }
+    #tab-map .map-legend { left: 12px; top: 12px; }
+    .locate { position: absolute; right: 12px; top: 12px; z-index: 500; width: 40px; height: 40px; border-radius: 12px; border: none; background: var(--surface); box-shadow: var(--shadow); display: grid; place-items: center; color: var(--ink); }
+    .sheet {
+      position: absolute; left: 0; right: 0; bottom: 0; z-index: 600; background: var(--surface); border-radius: 26px 26px 0 0;
+      box-shadow: 0 -12px 30px -12px rgba(0, 0, 0, .25); padding: 10px 20px 16px; max-height: 52%; overflow-y: auto; transition: max-height .25s;
+    }
+    .sheet.collapsed { max-height: 118px; overflow: hidden; }
+    .grab { width: 44px; height: 5px; border-radius: 3px; background: var(--line-2); margin: 0 auto 14px; border: none; display: block; padding: 0; }
+    .sh-route { display: flex; gap: 14px; align-items: center; padding-bottom: 14px; border-bottom: 1px solid var(--line); }
+    .sh-ic { width: 52px; height: 52px; border-radius: 14px; display: grid; place-items: center; flex: none; }
+    .sh-route .eyebrow { font-size: 10px; color: var(--muted); font-weight: 500; }
+    .sh-route b { display: block; font-size: 17px; margin: 2px 0; }
+    .sh-item { display: flex; gap: 12px; align-items: center; padding: 11px 0; border-bottom: 1px solid var(--line); font-size: 13.5px; }
+    .sh-item:last-child { border-bottom: none; }
+    .sh-item .pi { width: 30px; height: 30px; flex: none; }
+    .sh-item .map-pin { width: 30px !important; height: 30px !important; border-width: 2px; box-shadow: none; }
+    .sh-item small { display: block; color: var(--muted); font-size: 11.5px; }
+
+    /* Alerts tab */
+    .tab h2.title { font-size: 26px; margin-top: 8px; }
+    .seg { display: grid; grid-template-columns: repeat(3, 1fr); padding: 4px; border-radius: 14px; background: var(--surface-3); margin: 16px 0; }
+    .seg button { border: none; background: none; padding: 10px; border-radius: 11px; font-weight: 500; color: var(--ink-2); }
+    .seg button.active { background: var(--surface); color: var(--ink); box-shadow: var(--shadow); font-weight: 700; }
+    .alert-card { position: relative; background: var(--surface); border: 1px solid var(--line); border-radius: 18px; padding: 18px 18px 14px 22px; margin-bottom: 14px; box-shadow: var(--shadow); overflow: hidden; }
+    .alert-card::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 5px; background: var(--forest-3); }
+    .alert-card.old { background: var(--surface-2); box-shadow: none; }
+    .alert-card.old::before { background: transparent; }
+    .alert-card.old h3, .alert-card.old p { color: var(--muted); }
+    .ac-top { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); }
+    .ac-top b { font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--sage-ink); }
+    .alert-card.old .ac-top b { color: var(--muted); }
+    .ac-title { display: flex; align-items: center; gap: 12px; margin: 14px 0 10px; }
+    .ac-title .ai { width: 44px; height: 44px; border-radius: 12px; display: grid; place-items: center; }
+    .ac-title h3 { font-size: 23px; font-weight: 500; }
+    .alert-card p { margin: 0; font-size: 14.5px; line-height: 1.5; }
+    .ac-foot { display: flex; justify-content: space-between; align-items: center; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); font-size: 11.5px; color: var(--muted); }
+
+    /* Assistant tab */
+    #tab-assistant { display: flex; flex-direction: column; padding: 0; overflow: hidden; }
+    #tab-assistant[hidden] { display: none; }
+    .as-head { padding: 16px 20px 10px; display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+    .as-head h2 { font-size: 22px; }
+    .chat { flex: 1; overflow-y: auto; padding: 4px 20px 12px; display: flex; flex-direction: column; gap: 10px; }
+    .bubble { max-width: 86%; padding: 11px 14px; border-radius: 18px; font-size: 14px; line-height: 1.5; white-space: pre-wrap; word-break: break-word; }
+    .bubble .who { font-size: 10.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; opacity: .65; margin-bottom: 4px; display: flex; justify-content: space-between; gap: 10px; align-items: center; }
+    .b-user { align-self: flex-end; background: var(--forest-2); color: #f2f3ec; border-bottom-right-radius: 6px; }
+    .b-agent { align-self: flex-start; background: var(--surface); border: 1px solid var(--line); border-bottom-left-radius: 6px; box-shadow: var(--shadow); }
+    .b-gov { align-self: stretch; max-width: none; background: var(--amber-soft); border-left: 4px solid var(--amber); border-radius: 12px; }
+    .b-sys { align-self: center; max-width: 92%; background: var(--teal-soft); color: var(--teal); font-size: 12.5px; border-radius: 12px; text-align: center; }
+    .replay { border: none; background: none; padding: 2px; color: inherit; opacity: .8; display: inline-flex; }
+    .typing { align-self: flex-start; display: flex; gap: 4px; padding: 14px 16px; background: var(--surface); border: 1px solid var(--line); border-radius: 18px; }
+    .typing i { width: 6px; height: 6px; border-radius: 50%; background: var(--muted); animation: blink 1.2s infinite; }
+    .typing i:nth-child(2) { animation-delay: .2s; } .typing i:nth-child(3) { animation-delay: .4s; }
+    @keyframes blink { 0%, 80%, 100% { opacity: .25; } 40% { opacity: 1; } }
+    .suggest { display: flex; gap: 8px; overflow-x: auto; padding: 0 20px 10px; scrollbar-width: none; }
+    .suggest button { flex: none; display: inline-flex; align-items: center; gap: 7px; border: 1px solid var(--line-2); background: var(--surface); border-radius: 999px; padding: 9px 14px; font-size: 13px; font-weight: 600; color: var(--forest-2); }
+    .composer { display: flex; gap: 8px; align-items: center; padding: 10px 14px 12px; border-top: 1px solid var(--line); background: var(--surface-2); }
+    .composer input { flex: 1; min-width: 0; padding: 12px 14px; border-radius: 14px; border: 1px solid var(--line-2); background: var(--surface); outline: none; font-size: 16px; }
+    .composer input:focus { border-color: var(--amber-2); }
+    .round { width: 46px; height: 46px; border-radius: 50%; border: none; display: grid; place-items: center; flex: none; }
+    .mic { background: var(--forest-2); color: #fff; }
+    .mic.recording { background: var(--red); animation: pulse 1.6s infinite; }
+    .send { background: var(--amber); color: #fff; }
+    #agentStatus { padding: 0 20px 6px; font-size: 12px; min-height: 0; }
   </style>
 </head>
 <body>
-  <div class="phone">
-    <header>
-      <h1>📱 SURGE</h1>
-      <span id="langBadge" class="muted" style="margin-left:6px">🌐 auto</span>
-      <select id="areaSelect"></select>
-    </header>
+  <div class="app">
+      <header class="app-head on-dark">
+        <span class="brand"><span id="logo"></span><span class="name" id="wordmark"></span></span>
+        <button class="bell" id="bellBtn" aria-label="Alerts"><span data-icon="bell"></span><span class="ndot" id="bellDot" hidden></span></button>
+      </header>
 
-    <div id="banner" class="banner b-none"><div class="t">Loading…</div></div>
+      <main class="screen">
+        <!-- HOME -->
+        <section class="tab home" id="tab-home">
+          <span class="pill tone-amber"><i class="dot"></i>Demo information · not live</span>
+          <div class="greet" id="greet">Hello</div>
+          <h1>What’s happening near you</h1>
 
-    <div id="map"></div>
+          <div class="area-card" id="areaCard">
+            <div class="eyebrow">Your area</div>
+            <div class="val"><span id="areaName">—</span><span class="change">Change<span data-icon="chevronDown"></span></span></div>
+            <div class="area-hint" id="areaHint"></div>
+            <select id="areaSelect" aria-label="Your area"></select>
+          </div>
 
-    <div class="section">
-      <h3>Talk to the relief agent</h3>
-      <div class="muted" style="margin-bottom:6px">Speak or type in any language — the agent replies in yours.</div>
-      <div class="row">
-        <button id="callBtn" class="call">🎙️ Tap to talk</button>
-        <button id="briefBtn" class="brief">▶️ Hear briefing</button>
-      </div>
-      <div id="agentStatus" class="muted" style="margin-top:6px"></div>
-      <div class="chatbox" id="chat" style="margin-top:8px"></div>
-      <div class="row" style="margin-top:8px">
-        <input id="q" type="text" placeholder="Ask the agent…" />
-        <button id="sendBtn" class="brief" style="flex:0 0 auto">Send</button>
-      </div>
-    </div>
+          <div id="instCard" class="inst none"><p>Loading official instruction…</p></div>
 
-    <div class="section">
-      <h3>Report to government</h3>
-      <div class="row report-btns">
-        <button class="r-road" data-kind="road_hazard">🚧 Road blocked</button>
-        <button class="r-sos" data-kind="rescue_needed">🆘 I'm trapped</button>
-        <button class="r-seen" data-kind="rescue_seen">👁️ Saw someone</button>
-      </div>
-      <div id="reportMsg" class="muted" style="margin-top:6px"></div>
-    </div>
+          <div class="meta-row">
+            <div class="meta"><div class="eyebrow">Area risk</div><div id="riskMeta">—</div></div>
+            <div class="meta"><div class="eyebrow">Next official update</div><b id="nextMeta">—</b></div>
+          </div>
+
+          <div class="sec-title"><h3>Report to authorities</h3><span class="small muted">Shares your location</span></div>
+          <div class="acts" id="acts">
+            <button class="act sos" data-kind="rescue_needed"><span class="ai" data-icon="sos"></span><span>I’m trapped — need rescue<small>Sends an SOS pin to emergency operations</small></span></button>
+            <button class="act" data-kind="road_hazard"><span class="ai tone-orange" data-icon="road"></span><span>Road blocked<small>Flooded or closed</small></span></button>
+            <button class="act" data-kind="rescue_seen"><span class="ai tone-violet" data-icon="eye"></span><span>Saw someone<small>Needs help nearby</small></span></button>
+          </div>
+          <div id="reportMsg"></div>
+
+          <button class="ask" id="askBtn"><span class="ai" data-icon="chat"></span><span style="flex:1"><b>Ask the relief assistant</b><small>Speak or type in any language</small></span><span data-icon="chevronRight"></span></button>
+        </section>
+
+        <!-- MAP -->
+        <section class="tab" id="tab-map" hidden>
+          <div id="map"></div>
+          <div id="legendSlot"></div>
+          <button class="locate" id="locateBtn" aria-label="Show my location"><span data-icon="locate"></span></button>
+          <div class="sheet" id="sheet">
+            <button class="grab" id="grab" aria-label="Expand details"></button>
+            <div id="sheetBody"></div>
+            <div class="attrib">Map data © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap contributors</a></div>
+          </div>
+        </section>
+
+        <!-- ALERTS -->
+        <section class="tab" id="tab-alerts" hidden>
+          <div class="eyebrow" id="alertsArea">—</div>
+          <h2 class="title">Official alerts</h2>
+          <div class="seg" id="alSeg">
+            <button class="active" data-f="all">All</button>
+            <button data-f="current">Current</button>
+            <button data-f="past">Past</button>
+          </div>
+          <div id="alertList"><div class="empty">Loading alerts…</div></div>
+        </section>
+
+        <!-- ASSISTANT -->
+        <section class="tab" id="tab-assistant" hidden>
+          <div class="as-head">
+            <div><div class="eyebrow">Relief assistant</div><h2>How can we help?</h2></div>
+            <span class="pill tone-neutral" id="langBadge"><span data-icon="globe"></span>Auto</span>
+          </div>
+          <div class="chat" id="chat"></div>
+          <div id="agentStatus" class="muted"></div>
+          <div class="suggest" id="suggest">
+            <button data-q="Summarize the situation and my next actions." data-who="You (briefing)"><span data-icon="volume"></span>Hear briefing</button>
+          </div>
+          <div class="composer">
+            <button class="round mic" id="callBtn" aria-label="Tap to talk"><span data-icon="mic"></span></button>
+            <input id="q" type="text" placeholder="Ask in any language…" autocomplete="off" />
+            <button class="round send" id="sendBtn" aria-label="Send"><span data-icon="send"></span></button>
+          </div>
+        </section>
+      </main>
+
+      <nav class="tabbar" id="tabbar">
+        <button data-tab="home" class="active"><span data-icon="home"></span>Home</button>
+        <button data-tab="map"><span data-icon="map"></span>Map</button>
+        <button data-tab="alerts"><span data-icon="alert"></span>Alerts<span class="ndot" id="tabDot" hidden></span></button>
+        <button data-tab="assistant"><span data-icon="chat"></span>Assistant</button>
+      </nav>
   </div>
 
-  <script src="common.js"></script>
+  <script src="common.js?v=brand3"></script>
   <script>
+    const $ = (id) => document.getElementById(id);
     let current = "sunsari";
-    let map, layer, meMarker, myLoc = null, lastResponseId = null;
+    let tab = "home";
+    let map, layer, myLoc = null, lastResponseId = null;
+    let status = null, mapData = null, mapSig = "", needsFit = true, alertFilter = "all";
     // Tracks the instruction id the user has already been briefed on.
     // undefined = not yet baselined (first poll sets it silently).
     let lastSeenInstructionId;
     // Detected language of the caller (BCP-47); keeps replies + briefings in it.
     let userLang = null;
 
-    function initMap() {
-      map = L.map("map").setView(AREA_CENTERS[current], 12);
-      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-        maxZoom: 19, attribution: "© OpenStreetMap",
-      }).addTo(map);
-      layer = L.layerGroup().addTo(map);
+    document.querySelectorAll("[data-icon]").forEach((el) => { el.innerHTML = icon(el.dataset.icon, el.closest(".tabbar") ? 22 : 18); });
+    $("logo").innerHTML = LOGO_SVG;
+    $("wordmark").innerHTML = wordmark();
+    $("legendSlot").innerHTML = legendHtml();
+
+    function tickClock() {
+      const h = new Date().getHours();
+      $("greet").textContent = h < 5 ? "Good evening" : h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening";
     }
 
-    function fillAreaSelect() {
-      const sel = document.getElementById("areaSelect");
-      sel.innerHTML = AREAS.map(a => `<option value="${a}">${AREA_LABELS[a]}</option>`).join("");
-      sel.value = current;
-      sel.onchange = () => {
-        current = sel.value;
-        lastSeenInstructionId = undefined; // rebaseline for the new area
-        map.setView(AREA_CENTERS[current], 12);
-        refresh();
-      };
+    // ---- Tabs ----
+    function showTab(name) {
+      tab = name;
+      document.querySelectorAll(".tab").forEach((t) => { t.hidden = t.id !== "tab-" + name; });
+      document.querySelectorAll("#tabbar button").forEach((b) => b.classList.toggle("active", b.dataset.tab === name));
+      if (name === "map" && map) setTimeout(() => { map.invalidateSize(); if (needsFit) fitMap(); }, 0);
+      if (name === "alerts") { setUnseen(false); loadAlerts(); }
+      if (name === "assistant") setTimeout(() => { $("chat").scrollTop = $("chat").scrollHeight; }, 0);
+    }
+    document.querySelectorAll("#tabbar button").forEach((b) => { b.onclick = () => showTab(b.dataset.tab); });
+    $("bellBtn").onclick = () => showTab("alerts");
+    $("askBtn").onclick = () => { showTab("assistant"); $("q").focus(); };
+
+    function setUnseen(on) { $("bellDot").hidden = !on; $("tabDot").hidden = !on; }
+
+    // ---- Area ----
+    const sel = $("areaSelect");
+    sel.innerHTML = AREAS.map((a) => `<option value="${a}">${esc(AREA_LABELS[a])}</option>`).join("");
+    sel.value = current;
+    $("areaName").textContent = AREA_LABELS[current];
+    let areaManual = false;
+
+    function setAreaHint(reason) {
+      $("areaHint").textContent = AREA_HINTS[reason];
+      $("areaCard").classList.toggle("needs-pick", reason === "outside" || reason === "unavailable");
     }
 
-    function renderBanner(status) {
-      const b = document.getElementById("banner");
+    function setArea(areaId) {
+      if (areaId === current) return;
+      current = areaId;
+      sel.value = areaId;
+      $("areaName").textContent = AREA_LABELS[current];
+      lastSeenInstructionId = undefined; // rebaseline for the new area
+      mapSig = "";
+      needsFit = true;
+      map.setView(AREA_CENTERS[current], 12);
+      refresh();
+      if (tab === "alerts") loadAlerts();
+    }
+
+    sel.onchange = () => {
+      areaManual = true;
+      setAreaHint("manual");
+      setArea(sel.value);
+    };
+
+    // ---- Home: instruction card ----
+    function renderHome() {
+      const card = $("instCard");
       const inst = status.instruction;
+      const risk = riskInfo(status.summary.risk_level);
+      $("riskMeta").innerHTML = pill(`${risk.label} · ${Math.round(status.summary.risk_score * 100)}/100`, risk.tone);
+      $("nextMeta").textContent = inst && inst.next_update_at ? `By ${fmtClock(inst.next_update_at)}` : "When issued";
       if (!inst) {
-        b.className = "banner b-none";
-        b.innerHTML = `<div class="t">No official instruction yet</div>
-          <div class="muted">Risk: ${status.summary.risk_level}. Stay alert; monitor updates.</div>`;
+        card.className = "inst none";
+        card.innerHTML = `<div class="inst-top"><span>${icon("broadcast", 16)}Official instruction</span></div>
+          <h2 style="font-size:24px">No instruction yet</h2>
+          <p class="muted">No official instruction has been issued for ${esc(status.name)}. Stay alert, keep your phone charged and monitor updates.</p>`;
         return;
       }
-      b.className = "banner b-" + inst.severity;
-      let extra = "";
-      if (inst.instruction_type === "evacuate") {
-        if (inst.approved_route) extra += `Route: ${inst.approved_route.name}. `;
-        if (inst.shelter) extra += `Shelter: ${inst.shelter.name}.`;
+      const info = instructionInfo(inst.instruction_type);
+      card.className = "inst" + (inst.instruction_type === "all_clear" ? " clear" : "");
+      let go = "";
+      if (inst.instruction_type === "evacuate" && (inst.shelter || inst.approved_route)) {
+        go += `<div>${icon("home", 18)}<span><small>Go to</small><b>${esc(inst.shelter ? inst.shelter.name : "Designated shelter")}</b>${inst.approved_route ? `<small>Via ${esc(inst.approved_route.name)}</small>` : ""}</span></div>`;
       }
-      b.innerHTML = `<div class="t">${inst.instruction_type.toUpperCase()}</div>
-        <div>${inst.emergency_message}</div>
-        <div class="muted">${extra}</div>`;
+      if (inst.roads_to_avoid && inst.roads_to_avoid.length) {
+        go += `<div>${icon("x", 18)}<span><small>Avoid</small><b>${esc(inst.roads_to_avoid.map((r) => r.name).join(", "))}</b></span></div>`;
+      }
+      card.innerHTML = `
+        <div class="inst-top"><span>${icon("broadcast", 16)}Official instruction</span><span class="inst-cur">Current</span></div>
+        <h2>${esc(info.label)}</h2>
+        <p>${esc(inst.emergency_message)}</p>
+        ${go ? `<div class="inst-go">${go}</div>` : ""}
+        <div class="inst-foot"><span>Published ${esc(fmtWhen(inst.published_at).toLowerCase())}</span>
+          <button class="listen" data-inst="${esc(inst.publication_id)}">${icon("volume", 15)}Listen</button></div>`;
+      bindListen(card);
     }
 
-    function drawMap(mapData) {
-      layer.clearLayers();
-      if (myLoc) meMarker = L.marker([myLoc.lat, myLoc.lng], { icon: emojiIcon(MARKERS.me, 30) })
-        .bindPopup("You are here").addTo(layer);
-      if (mapData.shelter && mapData.shelter.location)
-        L.marker([mapData.shelter.location.coordinates[1], mapData.shelter.location.coordinates[0]],
-          { icon: emojiIcon(MARKERS.shelter) }).bindPopup("Shelter: " + mapData.shelter.name).addTo(layer);
-      (mapData.hospitals || []).forEach(h => h.location &&
-        L.marker([h.location.coordinates[1], h.location.coordinates[0]], { icon: emojiIcon(MARKERS.hospital) })
-          .bindPopup("Hospital: " + h.name).addTo(layer));
-      (mapData.closed_roads || []).forEach(r => r.geometry &&
-        L.marker([r.geometry.coordinates[1], r.geometry.coordinates[0]], { icon: emojiIcon(MARKERS.closed_road) })
-          .bindPopup("Closed: " + r.name).addTo(layer));
-      if (mapData.approved_route && mapData.approved_route.geometry) {
-        const coords = mapData.approved_route.geometry.coordinates.map(c => [c[1], c[0]]);
-        L.polyline(coords, { color: "#22c55e", weight: 5 }).addTo(layer);
-      }
-      (mapData.reports || []).forEach(rep => {
-        const c = rep.location.coordinates;
-        L.marker([c[1], c[0]], { icon: emojiIcon(reportEmoji(rep.kind), 22) })
-          .bindPopup(`${rep.kind}: ${rep.message}`).addTo(layer);
+    function bindListen(root) {
+      root.querySelectorAll("[data-inst]").forEach((b) => {
+        b.onclick = () => playTts({ kind: "instruction", instruction_id: b.dataset.inst }, b);
       });
     }
 
+    // ---- Map ----
+    function fitMap() {
+      if (!mapData) return;
+      const pts = [];
+      if (mapData.approved_route && mapData.approved_route.geometry) mapData.approved_route.geometry.coordinates.forEach((c) => pts.push([c[1], c[0]]));
+      if (mapData.shelter) pts.push(latLng(mapData.shelter.location));
+      mapData.closed_roads.forEach((r) => pts.push(latLng(r.geometry)));
+      mapData.hospitals.forEach((h) => pts.push(latLng(h.location)));
+      if (myLoc) pts.push([myLoc.lat, myLoc.lng]);
+      const valid = pts.filter(Boolean);
+      if (valid.length > 1) map.fitBounds(valid, { paddingTopLeft: [40, 70], paddingBottomRight: [40, 190], maxZoom: 15 });
+      else map.setView(AREA_CENTERS[current], 12);
+      needsFit = false;
+    }
+
+    function drawMap() {
+      const sig = JSON.stringify([current, mapData.current_instruction_id, mapData.reports, mapData.closed_roads, myLoc]);
+      if (sig === mapSig) return;
+      mapSig = sig;
+      layer.clearLayers();
+      drawAreaZone(layer, mapData.geometry, mapData.risk_level);
+      if (mapData.approved_route) drawRoute(layer, mapData.approved_route.geometry, `<b>Approved route</b><br>${esc(mapData.approved_route.name)}`);
+      const add = (ll, kind, popup, size) => ll && L.marker(ll, { icon: pinIcon(kind, size) }).bindPopup(popup).addTo(layer);
+      if (mapData.shelter) add(latLng(mapData.shelter.location), "shelter", `<b>${esc(mapData.shelter.name)}</b><br>Approved shelter`, 34);
+      mapData.hospitals.forEach((h) => add(latLng(h.location), "hospital", `<b>${esc(h.name)}</b><br>Hospital`));
+      mapData.closed_roads.forEach((r) => add(latLng(r.geometry), "closure", `<b>${esc(r.name)}</b><br>Closed — do not use`));
+      mapData.reports.forEach((r) => add(latLng(r.location), r.kind, `<b>${esc(reportInfo(r.kind).label)}</b><br>${esc(r.message)}`, 24));
+      if (myLoc) add([myLoc.lat, myLoc.lng], "me", "You are here", 18);
+      renderSheet();
+      if (needsFit && tab === "map") fitMap();
+    }
+
+    function renderSheet() {
+      const route = mapData.approved_route;
+      const items = [];
+      let head;
+      if (route) {
+        head = `<div class="sh-route"><span class="sh-ic tone-amber">${icon("arrowRight", 22)}</span>
+          <span><div class="eyebrow">Approved evacuation route</div><b>${esc(route.name)}</b>
+          <span class="muted small">${mapData.shelter ? "To " + esc(mapData.shelter.name) : ""}</span></span></div>`;
+      } else {
+        const risk = riskInfo(mapData.risk_level);
+        head = `<div class="sh-route"><span class="sh-ic tone-${risk.tone}">${icon("map", 22)}</span>
+          <span><div class="eyebrow">No active evacuation route</div><b>${esc(risk.label)} flood risk</b>
+          <span class="muted small">Follow the current official instruction.</span></span></div>`;
+      }
+      if (mapData.shelter) items.push(["shelter", mapData.shelter.name, "Approved shelter"]);
+      mapData.closed_roads.forEach((r) => items.push(["closure", r.name, "Closed road — avoid"]));
+      mapData.hospitals.forEach((h) => items.push(["hospital", h.name, "Hospital"]));
+      const counts = mapData.reports.reduce((m, r) => (m[r.kind] = (m[r.kind] || 0) + 1, m), {});
+      Object.entries(counts).forEach(([k, n]) => items.push([k, `${n} ${reportInfo(k).label.toLowerCase()} report${n === 1 ? "" : "s"}`, "From residents nearby"]));
+      $("sheetBody").innerHTML = head + items.map(([k, name, sub]) =>
+        `<div class="sh-item"><span class="pi">${pinIcon(k, 30).options.html}</span><span><b>${esc(name)}</b><small>${esc(sub)}</small></span></div>`).join("");
+    }
+    $("grab").onclick = () => $("sheet").classList.toggle("collapsed");
+    $("locateBtn").onclick = async () => {
+      try {
+        myLoc = await getLocation();
+        map.setView([myLoc.lat, myLoc.lng], 14);
+        if (mapData) drawMap();
+      } catch (_) { toast("Location unavailable — check permissions.", { error: true }); }
+    };
+
+    // ---- Alerts ----
+    let alerts = [];
+    async function loadAlerts() {
+      $("alertsArea").textContent = AREA_LABELS[current];
+      try {
+        const r = await api(`/api/public/alerts/${current}?limit=30`);
+        alerts = r.alerts;
+        renderAlerts();
+      } catch (e) {
+        $("alertList").innerHTML = `<div class="empty err">${esc(e.message)}</div>`;
+      }
+    }
+    function renderAlerts() {
+      const list = alerts.filter((a) => alertFilter === "all" || (alertFilter === "current" ? !a.superseded : a.superseded));
+      $("alertList").innerHTML = list.length ? list.map((a) => {
+        const info = instructionInfo(a.instruction_type);
+        return `<div class="alert-card ${a.superseded ? "old" : ""}">
+          <div class="ac-top"><b>${a.superseded ? "Superseded" : "Current instruction"}</b><span>${esc(fmtWhen(a.published_at))}</span></div>
+          <div class="ac-title"><span class="ai tone-${info.tone}">${icon(info.icon, 20)}</span><h3>${esc(info.label)}</h3></div>
+          <p>${esc(a.emergency_message)}</p>
+          <div class="ac-foot"><span>${a.superseded ? "Kept for reference only." : "This instruction applies now."}</span>
+            <button class="listen" data-inst="${esc(a.instruction_id)}">${icon("volume", 15)}Listen</button></div>
+        </div>`;
+      }).join("") : `<div class="empty">No ${alertFilter === "all" ? "" : alertFilter + " "}alerts for ${esc(AREA_LABELS[current])}.</div>`;
+      bindListen($("alertList"));
+    }
+    $("alSeg").querySelectorAll("button").forEach((b) => {
+      b.onclick = () => {
+        alertFilter = b.dataset.f;
+        $("alSeg").querySelectorAll("button").forEach((x) => x.classList.toggle("active", x === b));
+        renderAlerts();
+      };
+    });
+
+    // ---- Polling ----
     // When the government publishes a new/changed instruction, the agent
     // automatically briefs the user on what changed and whether it affects them.
     async function autoBrief(prevId) {
@@ -158,7 +488,7 @@
           body: JSON.stringify({ area_id: current, previous_instruction_id: prevId, language: userLang || "en" }),
         });
         if (data.briefing) {
-          addMsg("🏛️ Government update", data.briefing.text);
+          addMsg("gov", "Government update", data.briefing.text);
           lastResponseId = data.briefing.response_id;
           playTts({ kind: "assistant_response", response_id: data.briefing.response_id });
         }
@@ -166,48 +496,79 @@
     }
 
     async function refresh() {
+      const areaId = current;
       try {
-        const status = await api(`/api/public/status/${current}`);
-        renderBanner(status);
+        const [st, md] = await Promise.all([api(`/api/public/status/${areaId}`), api(`/api/public/map/${areaId}`)]);
+        if (areaId !== current) return;
+        status = st; mapData = md;
+        renderHome();
+        drawMap();
         const newId = status.instruction ? status.instruction.publication_id : null;
         if (lastSeenInstructionId === undefined) {
           lastSeenInstructionId = newId; // first poll: baseline silently
         } else if (newId && newId !== lastSeenInstructionId) {
           const prev = lastSeenInstructionId;
           lastSeenInstructionId = newId;
+          if (tab !== "alerts") setUnseen(true); else loadAlerts();
+          toast(`New official instruction: ${instructionInfo(status.instruction.instruction_type).label}`);
           autoBrief(prev); // a real government update arrived -> brief the user
         } else {
           lastSeenInstructionId = newId;
         }
-        const mapData = await api(`/api/public/map/${current}`);
-        drawMap(mapData);
       } catch (e) {
-        document.getElementById("agentStatus").innerHTML = `<span class="err">${e.message}</span>`;
+        $("agentStatus").innerHTML = `<span class="err">${esc(e.message)}</span>`;
       }
     }
 
-    // ---- Agent chat + voice ----
+    // ---- Assistant chat + voice ----
     function updateLangBadge() {
-      const el = document.getElementById("langBadge");
-      if (el) el.textContent = userLang ? "🌐 " + userLang : "🌐 auto";
+      $("langBadge").innerHTML = icon("globe", 14) + esc(userLang ? userLang.toUpperCase() : "Auto");
     }
 
-    function addMsg(who, txt) {
-      const c = document.getElementById("chat");
-      c.innerHTML += `<div class="msg"><div class="who">${who}</div><div class="txt">${txt}</div></div>`;
+    function modeLabel(mode) {
+      return mode === "gemini_grounded" ? "Grounded in official data" : mode === "deterministic" ? "Official guidance" : mode;
+    }
+
+    function addMsg(type, who, text, responseId) {
+      const c = $("chat");
+      const el = document.createElement("div");
+      el.className = "bubble b-" + type;
+      const replay = responseId ? `<button class="replay" title="Listen again" data-rid="${esc(responseId)}">${icon("volume", 14)}</button>` : "";
+      el.innerHTML = (who ? `<div class="who"><span>${esc(who)}</span>${replay}</div>` : "") + `<div></div>`;
+      el.lastChild.textContent = text;
+      const rb = el.querySelector(".replay");
+      if (rb) rb.onclick = () => playTts({ kind: "assistant_response", response_id: rb.dataset.rid }, rb);
+      c.appendChild(el);
       c.scrollTop = c.scrollHeight;
+      if (type === "gov" && tab !== "assistant") setUnseen(true);
     }
 
-    async function playTts(payload) {
+    function setThinking(on, label = "") {
+      const c = $("chat");
+      const t = c.querySelector(".typing");
+      if (on && !t) { c.insertAdjacentHTML("beforeend", `<div class="typing"><i></i><i></i><i></i></div>`); c.scrollTop = c.scrollHeight; }
+      if (!on && t) t.remove();
+      $("agentStatus").textContent = label;
+    }
+
+    let audio = null;
+    async function playTts(payload, btn) {
+      const original = btn ? btn.innerHTML : null;
+      if (btn) btn.innerHTML = `<span class="spinner"></span>${btn.classList.contains("replay") ? "" : "Loading"}`;
       try {
         const res = await fetch("/api/tts", {
           method: "POST", headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
         });
-        if (!res.ok) return;
+        if (!res.ok) { if (btn) toast("Audio isn’t available right now.", { error: true }); return; }
         const blob = await res.blob();
-        new Audio(URL.createObjectURL(blob)).play();
-      } catch (_) {}
+        if (audio) audio.pause();
+        audio = new Audio(URL.createObjectURL(blob));
+        await audio.play();
+      } catch (_) {
+      } finally {
+        if (btn) btn.innerHTML = original;
+      }
     }
 
     // Make sure we have a location before a turn so the agent can geo-tag an
@@ -220,46 +581,48 @@
 
     function noteAutoReport(resp) {
       if (resp.report_filed) {
-        addMsg("📍 Auto-reported to government",
-          `${resp.report_kind} pin filed at your location.`);
+        addMsg("sys", "", `Reported to government: ${reportInfo(resp.report_kind).label.toLowerCase()} pin filed at your location.`);
         refresh();
       }
     }
 
+    function handleAgent(r) {
+      lastResponseId = r.response_id;
+      userLang = r.language || userLang;
+      updateLangBadge();
+      addMsg("agent", `Assistant · ${modeLabel(r.mode)}`, r.text, r.response_id);
+      noteAutoReport(r);
+      playTts({ kind: "assistant_response", response_id: r.response_id });
+    }
+
     async function sendChat(question, who = "You") {
-      addMsg(who, question);
-      document.getElementById("agentStatus").textContent = "Agent thinking…";
+      addMsg("user", who, question);
+      setThinking(true, "Assistant is thinking…");
       await ensureLoc();
       try {
         const body = { area_id: current, question };
         if (myLoc) { body.latitude = myLoc.lat; body.longitude = myLoc.lng; }
         if (userLang) body.language = userLang;
         const r = await api("/api/chat", { method: "POST", body: JSON.stringify(body) });
-        lastResponseId = r.response_id;
-        userLang = r.language || userLang;
-        updateLangBadge();
-        addMsg("Agent (" + r.mode + ")", r.text);
-        document.getElementById("agentStatus").textContent = "";
-        noteAutoReport(r);
-        playTts({ kind: "assistant_response", response_id: r.response_id });
+        setThinking(false);
+        handleAgent(r);
       } catch (e) {
-        document.getElementById("agentStatus").innerHTML = `<span class="err">${e.message}</span>`;
+        setThinking(false);
+        $("agentStatus").innerHTML = `<span class="err">${esc(e.message)}</span>`;
       }
     }
 
-    document.getElementById("sendBtn").onclick = () => {
-      const q = document.getElementById("q");
+    $("sendBtn").onclick = () => {
+      const q = $("q");
       if (q.value.trim()) { sendChat(q.value.trim()); q.value = ""; }
     };
-    document.getElementById("q").addEventListener("keydown", e => { if (e.key === "Enter") document.getElementById("sendBtn").click(); });
-
-    document.getElementById("briefBtn").onclick = () =>
-      sendChat("Summarize the situation and my next actions.", "You (briefing)");
+    $("q").addEventListener("keydown", (e) => { if (e.key === "Enter") $("sendBtn").click(); });
+    $("suggest").querySelectorAll("button").forEach((b) => { b.onclick = () => sendChat(b.dataset.q, b.dataset.who || "You"); });
 
     // Voice: tap to record, tap to stop -> /api/voice (STT + agent) -> TTS.
     let mediaRecorder, chunks = [];
-    document.getElementById("callBtn").onclick = async () => {
-      const btn = document.getElementById("callBtn");
+    $("callBtn").onclick = async () => {
+      const btn = $("callBtn");
       if (mediaRecorder && mediaRecorder.state === "recording") {
         mediaRecorder.stop();
         return;
@@ -268,10 +631,10 @@
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         mediaRecorder = new MediaRecorder(stream);
         chunks = [];
-        mediaRecorder.ondataavailable = e => chunks.push(e.data);
+        mediaRecorder.ondataavailable = (e) => chunks.push(e.data);
         mediaRecorder.onstop = async () => {
-          stream.getTracks().forEach(t => t.stop());
-          btn.classList.remove("recording"); btn.textContent = "🎙️ Tap to talk";
+          stream.getTracks().forEach((t) => t.stop());
+          btn.classList.remove("recording"); btn.innerHTML = icon("mic", 18);
           const blob = new Blob(chunks, { type: "audio/webm" });
           await ensureLoc();
           const fd = new FormData();
@@ -279,67 +642,78 @@
           fd.append("audio", blob, "clip.webm");
           if (myLoc) { fd.append("latitude", myLoc.lat); fd.append("longitude", myLoc.lng); }
           if (userLang) fd.append("language", userLang);
-          document.getElementById("agentStatus").textContent = "Transcribing…";
+          setThinking(true, "Transcribing…");
           try {
             const res = await fetch("/api/voice", { method: "POST", body: fd });
             const data = await res.json();
-            if (!res.ok) throw new Error(JSON.stringify(data));
-            addMsg("You (voice)", data.transcript || "(no speech detected)");
-            lastResponseId = data.response.response_id;
-            userLang = data.response.language || userLang;
-            updateLangBadge();
-            addMsg("Agent (" + data.response.mode + ")", data.response.text);
-            document.getElementById("agentStatus").textContent = "";
-            noteAutoReport(data.response);
-            playTts({ kind: "assistant_response", response_id: data.response.response_id });
+            if (!res.ok) throw new Error((data.error && data.error.message) || JSON.stringify(data));
+            setThinking(false);
+            addMsg("user", "You (voice)", data.transcript || "(no speech detected)");
+            handleAgent(data.response);
           } catch (e) {
-            document.getElementById("agentStatus").innerHTML = `<span class="err">${e.message}</span>`;
+            setThinking(false);
+            $("agentStatus").innerHTML = `<span class="err">${esc(e.message)}</span>`;
           }
         };
         mediaRecorder.start();
-        btn.classList.add("recording"); btn.textContent = "⏹️ Tap to stop";
+        btn.classList.add("recording"); btn.innerHTML = icon("stop", 18);
+        $("agentStatus").textContent = "Listening… tap again to stop.";
       } catch (e) {
-        document.getElementById("agentStatus").innerHTML = `<span class="err">Mic error: ${e.message}</span>`;
+        $("agentStatus").innerHTML = `<span class="err">Mic error: ${esc(e.message)}</span>`;
       }
     };
 
     // ---- Reports ----
-    document.querySelectorAll(".report-btns button").forEach(btn => {
+    const REPORT_MESSAGES = {
+      road_hazard: "Road in front of me is blocked by floodwater.",
+      rescue_needed: "I am trapped and need rescue.",
+      rescue_seen: "I see someone stuck and needing help nearby.",
+    };
+    document.querySelectorAll("#acts .act").forEach((btn) => {
       btn.onclick = async () => {
         const kind = btn.dataset.kind;
-        const out = document.getElementById("reportMsg");
-        out.textContent = "Getting your location…";
+        const out = $("reportMsg");
+        out.innerHTML = `<span class="muted"><span class="spinner"></span> Getting your location…</span>`;
         let loc;
         try { loc = await getLocation(); myLoc = loc; }
-        catch (e) { out.innerHTML = `<span class="err">Location needed to report (denied).</span>`; return; }
-        const messages = {
-          road_hazard: "Road in front of me is blocked by floodwater.",
-          rescue_needed: "I am trapped and need rescue.",
-          rescue_seen: "I see someone stuck and needing help nearby.",
-        };
+        catch (e) { out.innerHTML = `<span class="err">Location is needed to send a report. Please allow location access.</span>`; return; }
+        btn.disabled = true;
         try {
           const r = await api("/api/public/reports", {
             method: "POST",
             body: JSON.stringify({
-              area_id: current, kind, message: messages[kind],
+              area_id: current, kind, message: REPORT_MESSAGES[kind],
               location: { type: "Point", coordinates: [loc.lng, loc.lat] },
               reported_at: new Date().toISOString(),
               idempotency_key: deviceId() + ":" + kind + ":" + Date.now(),
             }),
           });
-          out.innerHTML = `<span class="ok">Reported (${r.verification_state}). Government can see it now.</span>`;
+          out.innerHTML = `<span class="ok">${icon("check", 14)} Sent (${esc(VERIFICATION[r.verification_state] || r.verification_state)}). Emergency operations can see it now.</span>`;
+          out.querySelector(".icon").style.display = "inline";
           refresh();
-        } catch (e) { out.innerHTML = `<span class="err">${e.message}</span>`; }
+        } catch (e) { out.innerHTML = `<span class="err">${esc(e.message)}</span>`; }
+        finally { btn.disabled = false; }
       };
     });
 
+    // ---- Boot ----
     (async function () {
-      fillAreaSelect();
-      initMap();
+      tickClock();
+      setInterval(tickClock, 30000);
+      map = baseMap("map", AREA_CENTERS[current], 12, { controls: false });
+      layer = L.layerGroup().addTo(map);
+      addMsg("agent", "Assistant", "Hi, I’m the SURGE relief assistant. I answer using the official instruction for your area. Ask me anything, in any language — or tap the microphone to talk.");
       await refresh();
       setInterval(refresh, 3000);
-      // Try to drop a "you are here" pin without blocking.
-      getLocation().then(l => { myLoc = l; map.setView([l.lat, l.lng], 13); refresh(); }).catch(() => {});
+      // Pick the area from the device location; fall back to the dropdown.
+      setAreaHint("detecting");
+      detectArea().then(({ area, loc, reason }) => {
+        if (loc) myLoc = loc;
+        if (areaManual) return;
+        setAreaHint(reason);
+        if (area) setArea(area);
+        if (mapData) drawMap();
+      });
     })();
   </script>
 </body>

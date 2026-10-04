@@ -37,6 +37,10 @@ class SubmitReportResponse(BaseModel):
     received_at: datetime
 
 
+class UpdateReportStateRequest(BaseModel):
+    verification_state: VerificationState
+
+
 class ReportsResponse(BaseModel):
     reports: list[Report]
     next_cursor: str | None = None

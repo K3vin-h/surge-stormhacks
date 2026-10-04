@@ -14,7 +14,7 @@ from ..schemas.instructions import (
     PublishInstructionRequest,
     PublishResponse,
 )
-from ..schemas.reports import ReportsResponse
+from ..schemas.reports import Report, ReportsResponse, UpdateReportStateRequest
 from ..services import cache, events, instructions, models, reports as reports_svc
 from ..util import decode_cursor, next_cursor, now_utc
 
@@ -102,3 +102,11 @@ def gov_reports(
         reports=rows,
         next_cursor=next_cursor(offset, limit, len(rows)),
     )
+
+
+@router.patch("/reports/{report_id}", response_model=Report)
+def update_report(report_id: str, req: UpdateReportStateRequest) -> Report:
+    report = reports_svc.set_state(report_id, req.verification_state)
+    if report is None:
+        raise not_found(f"Unknown report '{report_id}'.")
+    return report

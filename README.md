@@ -1,8 +1,23 @@
 # SURGE
 
-The existing government and resident interfaces are served by the [SURGE backend](backend/README.md).
+Flood response intelligence: a government dashboard, a resident app, and the Rasuwa route planner. Pages and demo data live in this repo. Nothing has to be created on one person's machine first.
 
-The migrated **Rasuwa map and route planner** runs independently at `/rasuwa/`. It includes real ward/village geography, nearby destination candidates, risk overlays, and separate walking/vehicle route searches. See [its setup, demo, and tests](frontend/rasuwa/README.md).
+## Run
+
+From the repo root, with Python 3.11+:
+
+```sh
+python -m venv .venv
+.venv/Scripts/python -m pip install -r backend/requirements.txt   # Windows
+# source .venv/bin/activate && pip install -r backend/requirements.txt  # macOS/Linux
+.venv/Scripts/python -m uvicorn app.main:app --app-dir backend --host 127.0.0.1 --port 8008
+```
+
+Open http://127.0.0.1:8008/ . The same server serves the home page, `/gov`, `/victim`, and `/rasuwa/`.
+
+No `.env`, Snowflake account, Gemini key, or ElevenLabs key is required. Without them the API stores instructions, reports, and events in `backend/local.db` (gitignored, created on first start) and fills an empty database from `backend/app/db/seed.py`. Everyone who clones the repo gets the same demo. Copy `.env.example` to `.env` only when connecting a real Snowflake account or the voice providers.
+
+The migrated **Rasuwa map and route planner** is also linked from the government page. Its geography and MapLibre files are in the repo. See [its demo and tests](frontend/rasuwa/README.md). The planner alone can be served with `npm run serve` from `frontend/rasuwa`.
 
 ```sh
 cd frontend/rasuwa

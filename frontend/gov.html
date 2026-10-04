@@ -3,242 +3,945 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>SURGE — Government Dashboard</title>
+  <title>SURGE — Government</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <link rel="stylesheet" href="theme.css?v=brand3" />
   <style>
-    * { box-sizing: border-box; }
-    body { font-family: system-ui, sans-serif; margin: 0; background: #0b1220; color: #e6edf3; }
-    header { display: flex; align-items: center; gap: 16px; padding: 10px 16px; background: #121b2e; border-bottom: 1px solid #22304a; }
-    header h1 { font-size: 18px; margin: 0; }
-    select, input, textarea, button { font: inherit; }
-    .layout { display: grid; grid-template-columns: 360px 1fr; gap: 12px; padding: 12px; height: calc(100vh - 53px); }
-    .col { display: flex; flex-direction: column; gap: 12px; overflow: auto; }
-    .card { background: #121b2e; border: 1px solid #22304a; border-radius: 10px; padding: 12px; }
-    .card h3 { margin: 0 0 8px; font-size: 14px; color: #9fb0c3; text-transform: uppercase; letter-spacing: .04em; }
-    #map { height: 100%; min-height: 420px; border-radius: 10px; }
-    .area-row { display: flex; justify-content: space-between; padding: 8px; border-radius: 8px; cursor: pointer; border: 1px solid transparent; }
-    .area-row:hover { background: #0e1830; }
-    .area-row.active { border-color: #4b7bec; background: #0e1830; }
-    .pill { font-size: 11px; padding: 2px 8px; border-radius: 999px; }
-    .sev-severe, .sev-critical { background: #7f1d1d; }
-    .sev-high, .sev-warning { background: #9a3412; }
-    .sev-moderate, .sev-advisory { background: #854d0e; }
-    .sev-low, .sev-info { background: #14532d; }
-    label { display: block; font-size: 12px; margin: 8px 0 3px; color: #9fb0c3; }
-    input, select, textarea { width: 100%; padding: 7px; background: #0b1220; color: #e6edf3; border: 1px solid #22304a; border-radius: 6px; }
-    button.primary { background: #4b7bec; color: white; border: none; padding: 9px; border-radius: 6px; cursor: pointer; width: 100%; margin-top: 10px; }
-    button.primary:hover { background: #3867d6; }
-    .report { border-bottom: 1px solid #22304a; padding: 7px 0; font-size: 13px; }
-    .report .k { font-weight: 600; }
-    .muted { color: #6b7a90; font-size: 12px; }
-    .ok { color: #4ade80; } .err { color: #f87171; }
-    .layout.full { grid-template-columns: 1fr; }
+    :root { --rail-w: 344px; --cmp-w: 404px; --gap: 14px; }
+    [hidden] { display: none !important; }
+    body { height: 100vh; overflow: hidden; background: #dcdad0; }
+    ::-webkit-scrollbar { width: 9px; }
+    ::-webkit-scrollbar-thumb { background: rgba(70, 77, 64, .22); border-radius: 9px; border: 2px solid transparent; background-clip: padding-box; }
+
+    .glass {
+      background: rgba(255, 252, 245, .93); backdrop-filter: blur(16px) saturate(1.15); -webkit-backdrop-filter: blur(16px) saturate(1.15);
+      border: 1px solid rgba(255, 255, 255, .7); border-radius: 18px;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, .7), 0 14px 34px -14px rgba(28, 33, 23, .32), 0 2px 6px rgba(28, 33, 23, .06);
+    }
+    .lbl { font-size: 10px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
+
+    /* ---------- Map canvas ---------- */
+    #map { position: fixed; top: 0; left: 0; bottom: 0; right: var(--cmp-w); z-index: 0; }
+    .leaflet-control-zoom { margin: 0 14px 14px 0 !important; }
+    .emoji-pin {
+      width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; font-size: 15px; line-height: 1;
+      background: #fbfaf5; border: 2px solid var(--line-2); box-shadow: 0 2px 8px rgba(0, 0, 0, .2); transition: transform .15s;
+    }
+    .emoji-pin:hover { transform: scale(1.12); }
+    .ep-shelter { border-color: var(--forest-3); }
+    .ep-shelter.designated { box-shadow: 0 0 0 4px rgba(184, 116, 47, .35), 0 3px 10px rgba(0, 0, 0, .22); border-color: var(--amber); }
+    .ep-hospital { border-color: var(--red); }
+    .ep-closure { border-color: var(--red); background: #fbecea; }
+    .ep-road_hazard { border-color: var(--orange); }
+    .ep-rescue_needed { border-color: #c0392b; animation: pulse 1.8s infinite; }
+    .ep-rescue_seen { border-color: var(--violet); }
+    .ep-dim { opacity: .5; filter: grayscale(.6); animation: none; }
+
+    /* ---------- Left rail ---------- */
+    .rail {
+      position: fixed; z-index: 900; top: var(--gap); left: var(--gap); bottom: var(--gap); width: var(--rail-w);
+      display: flex; flex-direction: column; gap: 10px; pointer-events: none;
+    }
+    .rail > * { pointer-events: auto; }
+    .rail-top { padding: 16px 16px 10px; flex: none; }
+    .brand-row { display: flex; align-items: center; gap: 10px; }
+    .brand-row .logo { display: flex; }
+    .brand-row .logo .emblem { width: 30px; height: 30px; }
+    .brand-row .word { font-size: 16px; color: var(--ink); display: flex; }
+    .brand-row .gov { font-size: 9.5px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; padding: 3px 6px; border-radius: 5px; background: var(--forest-2); color: #eef0e7; }
+    .tools { margin-left: auto; margin-right: -7px; display: flex; gap: 2px; }
+    .tool { width: 30px; height: 30px; padding: 0; border: none; background: none; border-radius: 9px; display: grid; place-items: center; color: var(--ink-2); }
+    .tool:hover { background: rgba(70, 77, 64, .08); color: var(--ink); }
+
+    .area-field { margin-top: 14px; }
+    .area-field select { padding: 10px 38px 10px 12px; border-radius: 11px; font-weight: 600; font-size: 14px; background-color: #fff; }
+    .area-field.needs-pick select { border: 2px solid var(--amber-2); background-color: var(--amber-soft); }
+    #areaHint { display: block; font-size: 11px; color: var(--muted); margin-top: 5px; }
+    #areaHint:empty { display: none; }
+    #areaHint.warn { color: var(--amber); font-weight: 600; }
+
+    .pq-head { margin: 16px 0 4px; }
+    .pq {
+      width: 100%; display: grid; grid-template-columns: 22px 1fr auto; gap: 10px; align-items: center; text-align: left;
+      padding: 8px 8px; margin: 0 -8px; width: calc(100% + 16px); border: none; background: none; border-radius: 11px; transition: background .15s;
+    }
+    .pq:hover { background: rgba(255, 255, 255, .7); }
+    .pq.active { background: #fff; box-shadow: 0 1px 3px rgba(28, 33, 23, .1); }
+    .pq-rank { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font-size: 11px; font-weight: 600; color: var(--ink-2); background: rgba(70, 77, 64, .08); font-variant-numeric: tabular-nums; }
+    .pq.active .pq-rank { background: var(--forest-2); color: #eef0e7; }
+    .pq-name { font-weight: 600; font-size: 13.5px; display: block; }
+    .pq-sub { font-size: 11px; color: var(--muted); display: block; margin-top: 1px; }
+    .risk { display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; font-weight: 600; }
+    .risk i { width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+
+    /* Feed */
+    .feed { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
+    .feed-head { padding: 12px 12px 8px; flex: none; }
+    .seg { display: flex; padding: 3px; border-radius: 11px; background: rgba(70, 77, 64, .08); }
+    .seg button { flex: 1; border: none; background: none; padding: 7px 8px; border-radius: 9px; font-size: 12.5px; font-weight: 500; color: var(--ink-2); display: inline-flex; justify-content: center; align-items: baseline; gap: 6px; }
+    .seg button b { font-weight: 600; color: var(--muted); font-size: 11px; }
+    .seg button.active { background: #fff; color: var(--ink); font-weight: 600; box-shadow: 0 1px 3px rgba(28, 33, 23, .12); }
+    .kinds { display: flex; gap: 6px; margin-top: 8px; }
+    .kinds button { border: 1px solid var(--line-2); background: transparent; border-radius: 999px; padding: 4px 10px; font-size: 11.5px; color: var(--ink-2); display: inline-flex; gap: 5px; align-items: center; }
+    .kinds button.active { background: var(--ink); border-color: var(--ink); color: #f4f2ea; }
+    .feed-list { flex: 1; overflow: auto; padding: 0 6px 8px; }
+    .fi {
+      width: 100%; display: grid; grid-template-columns: 30px 1fr; gap: 10px; text-align: left; padding: 9px 8px;
+      border: none; background: none; border-radius: 11px; transition: background .15s;
+    }
+    button.fi:hover { background: rgba(255, 255, 255, .75); }
+    .fi + .fi { box-shadow: inset 0 1px 0 rgba(70, 77, 64, .08); }
+    .fi:hover + .fi { box-shadow: none; }
+    .fi-ic { width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center; font-size: 15px; background: rgba(70, 77, 64, .07); }
+    .fi-msg { font-size: 12.5px; line-height: 1.38; font-weight: 500; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+    .fi-meta { font-size: 10.5px; color: var(--muted); margin-top: 2px; display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+    .fr { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; border-radius: 11px; transition: background .15s; }
+    .fr:hover { background: rgba(255, 255, 255, .75); }
+    .fr + .fr { box-shadow: inset 0 1px 0 rgba(70, 77, 64, .08); }
+    .fr:hover + .fr { box-shadow: none; }
+    .fr button.fi:hover { background: none; }
+    .fr.done .fi-ic, .fr.done .fi-msg { opacity: .5; }
+    .fi-acts { display: flex; padding: 10px 8px 0 0; opacity: 0; transition: opacity .15s; }
+    .fr:hover .fi-acts, .fr:focus-within .fi-acts { opacity: 1; }
+    @media (hover: none) { .fi-acts { opacity: 1; } }
+    .fa { width: 28px; height: 28px; padding: 0; border-radius: 8px; border: 1px solid var(--line-2); background: #fff; display: grid; place-items: center; color: var(--ink-2); }
+    .fa:hover { border-color: var(--teal); background: var(--teal-soft); color: var(--teal); }
+    .fi-foot { display: block; width: 100%; margin: 4px 0 0; padding: 9px 8px; border: none; background: none; border-radius: 9px; color: var(--muted); font-size: 11.5px; font-weight: 600; }
+    .fi-foot:hover { background: rgba(255, 255, 255, .75); color: var(--ink-2); }
+    .vs { font-weight: 600; }
+    .vs-unverified { color: var(--ink-2); }
+    .vs-reviewed, .vs-actioned, .vs-resolved { color: var(--teal); }
+    .vs-duplicate, .vs-false_report { color: var(--red); }
+
+    /* ---------- Situation line + legend ---------- */
+    .sitline {
+      position: fixed; z-index: 800; top: var(--gap); left: calc(var(--rail-w) + var(--gap) * 2);
+      right: calc(var(--cmp-w) + var(--gap));
+      display: flex; align-items: center; gap: 16px; padding: 10px 16px; font-size: 12.5px; color: var(--ink-2); border-radius: 14px;
+    }
+    #sitline { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 0; min-width: 0; }
+    #sitline > span { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+    #sitline > span + span::before { content: ""; width: 3px; height: 3px; border-radius: 50%; background: var(--line-2); margin: 0 11px; }
+    #sitline .where { font-weight: 700; color: var(--ink); font-size: 13.5px; }
+    #sitline b { color: var(--ink); font-weight: 700; font-variant-numeric: tabular-nums; }
+    .live-state { margin-left: auto; flex: none; display: inline-flex; align-items: center; gap: 7px; font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+    .live-state .sys-dot { animation: breathe 2.4s ease-in-out infinite; }
+    @keyframes breathe { 50% { opacity: .4; } }
+
+    .legend-wrap { position: fixed; z-index: 800; bottom: var(--gap); left: calc(var(--rail-w) + var(--gap) * 2); display: flex; flex-direction: column-reverse; align-items: flex-start; gap: 8px; }
+    .map-btns { display: flex; gap: 8px; }
+    .key-btn { border-radius: 10px; padding: 7px 12px; font-size: 12px; font-weight: 600; color: var(--ink-2); display: inline-flex; align-items: center; gap: 7px; }
+    .key-btn[aria-expanded="true"] { background: var(--forest-2); color: #f1f3ea; border-color: var(--forest-2); }
+
+    /* ---------- Route planner drawer ---------- */
+    .planner {
+      position: fixed; z-index: 1000; top: var(--gap); bottom: var(--gap); left: var(--gap); right: calc(var(--cmp-w) + var(--gap));
+      display: flex; flex-direction: column; overflow: hidden; border-radius: 20px; background: var(--bg);
+      box-shadow: 0 30px 80px -24px rgba(13, 21, 17, .55), 0 0 0 1px rgba(17, 28, 22, .08);
+      transform: translateY(16px) scale(.985); opacity: 0; visibility: hidden;
+      transition: transform .22s ease, opacity .22s ease, visibility 0s linear .22s;
+    }
+    .planner.open { transform: none; opacity: 1; visibility: visible; transition: transform .22s ease, opacity .22s ease; }
+    .planner-head {
+      flex: none; display: flex; align-items: center; gap: 12px; padding: 12px 14px 12px 18px; color: #eef0e7;
+      background: linear-gradient(90deg, rgba(13, 21, 17, .95) 35%, rgba(13, 21, 17, .72)), url("assets/brand/hero-dark.jpg") 100% 0% / 160% auto no-repeat, #0d1511;
+    }
+    .planner-head .ic { width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; background: rgba(154, 174, 139, .18); color: var(--brand-sage-2); }
+    .planner-head h2 { font-size: 15px; font-weight: 600; letter-spacing: -.01em; }
+    .planner-head p { margin: 1px 0 0; font-size: 11.5px; color: rgba(238, 240, 231, .6); }
+    .planner-head .acts { margin-left: auto; display: flex; gap: 6px; align-items: center; }
+    .planner-head .hbtn {
+      display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 11px; border-radius: 9px; font-size: 12px; font-weight: 600;
+      border: 1px solid rgba(255, 255, 255, .14); background: rgba(255, 255, 255, .06); color: #eef0e7; text-decoration: none;
+    }
+    .planner-head .hbtn:hover { background: rgba(255, 255, 255, .12); }
+    .planner-head .hbtn.icon-only { width: 32px; padding: 0; justify-content: center; }
+    .planner iframe { flex: 1; width: 100%; border: 0; display: block; background: var(--bg); }
+    .key-btn[aria-pressed="true"] { background: var(--forest-2); color: #f1f3ea; border-color: var(--forest-2); }
+    .legend { width: 272px; padding: 10px 6px 6px; border-radius: 14px; font-size: 12.5px; color: var(--ink); }
+    .legend > .lbl { padding: 2px 10px 6px; }
+    .lt { display: grid; grid-template-columns: 22px minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 7px 10px; border-radius: 9px; cursor: pointer; transition: opacity .15s; }
+    .lt:hover { background: rgba(70, 77, 64, .06); }
+    .lt .le { font-size: 14px; line-height: 1; display: grid; place-items: center; }
+    .lt b { font-weight: 600; display: block; }
+    .lt small { display: block; color: var(--muted); font-size: 11px; margin-top: 1px; }
+    .lt .lg-route { width: 18px; }
+    .lt.masked { opacity: .45; }
+    .zone-sw { width: 16px; height: 12px; border-radius: 3px; border: 1.5px dashed var(--red); background: rgba(163, 59, 50, .08); }
+    .sw-toggle {
+      appearance: none; -webkit-appearance: none; margin: 0; width: 30px; height: 18px; border-radius: 999px; flex: none;
+      background: var(--line-2); position: relative; cursor: pointer; transition: background .15s;
+    }
+    .sw-toggle::after { content: ""; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%; background: #fff; box-shadow: 0 1px 2px rgba(0, 0, 0, .2); transition: transform .15s; }
+    .sw-toggle:checked { background: var(--forest-2); }
+    .sw-toggle:checked::after { transform: translateX(12px); }
+    .sw-toggle:focus-visible { outline: 2px solid var(--brand-sage); outline-offset: 2px; }
+    #layerNote { margin: 4px 10px 4px; font-size: 11.5px; color: var(--ink-2); }
+    #layerNote:empty { display: none; }
+
+    .pop-acts { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 10px; }
+    .pop-acts button { border: 1px solid var(--line-2); background: #fff; border-radius: 8px; padding: 5px 9px; font-size: 11.5px; font-weight: 600; color: var(--ink-2); }
+    .pop-acts button:hover { border-color: var(--ink-2); color: var(--ink); }
+    .pop-acts button.primary { background: var(--forest-2); border-color: var(--forest-2); color: #f1f3ea; }
+
+    .undo {
+      position: fixed; z-index: 1500; left: calc((100% - var(--cmp-w)) / 2); bottom: 66px; transform: translate(-50%, 16px);
+      display: flex; align-items: center; gap: 14px; padding: 8px 8px 8px 16px; border-radius: 12px;
+      background: var(--forest); color: #f1f3ea; font-size: 13px; box-shadow: var(--shadow-lg);
+      opacity: 0; pointer-events: none; transition: opacity .2s, transform .2s;
+    }
+    .undo.show { opacity: 1; transform: translate(-50%, 0); pointer-events: auto; }
+    .undo button { border: none; background: rgba(255, 255, 255, .12); color: #fff; font-weight: 600; font-size: 12.5px; padding: 6px 12px; border-radius: 8px; }
+    .undo button:hover { background: rgba(255, 255, 255, .2); }
+
+    /* ---------- Composer (right) ---------- */
+    .composer {
+      position: fixed; z-index: 950; top: 0; right: 0; bottom: 0; width: var(--cmp-w);
+      background: var(--surface); border-left: 1px solid var(--line); display: flex; flex-direction: column;
+      box-shadow: -12px 0 30px -18px rgba(28, 33, 23, .25);
+    }
+    .cmp-scroll { flex: 1; overflow: auto; padding: 16px 18px 6px; }
+
+    .live {
+      border-radius: 16px; padding: 16px 18px 14px; color: #eef0e7; position: relative; overflow: hidden;
+      background:
+        linear-gradient(160deg, rgba(17, 28, 22, .9) 0%, rgba(13, 21, 17, .78) 100%),
+        url("assets/brand/hero-dark.jpg") 0% 100% / 340% auto no-repeat, #0d1511;
+    }
+    .live .lbl { color: rgba(238, 240, 231, .6); display: flex; align-items: center; gap: 8px; }
+    .live .beacon { width: 7px; height: 7px; border-radius: 50%; background: #e0675a; box-shadow: 0 0 0 0 rgba(224, 103, 90, .6); animation: beacon 1.8s infinite; }
+    .live .beacon.calm { background: #8fbf6a; animation: none; }
+    @keyframes beacon { 70% { box-shadow: 0 0 0 8px rgba(224, 103, 90, 0); } 100% { box-shadow: 0 0 0 0 rgba(224, 103, 90, 0); } }
+    .live h3 { font-size: 23px; font-weight: 600; margin: 8px 0 6px; letter-spacing: -.02em; display: flex; align-items: center; gap: 9px; }
+    .live .sev { margin-left: auto; font-size: 10px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; padding: 3px 8px; border-radius: 6px; background: rgba(255, 255, 255, .1); color: #f1d3a6; }
+    .live p { margin: 0; font-size: 13px; line-height: 1.5; color: rgba(238, 240, 231, .88); }
+    .live .facts { margin-top: 12px; display: grid; gap: 6px; font-size: 12px; position: relative; z-index: 1; }
+    .live .facts div { display: grid; grid-template-columns: 20px 1fr; gap: 6px; }
+    .live .foot { margin-top: 12px; padding-top: 10px; border-top: 1px solid rgba(255, 255, 255, .1); display: flex; justify-content: space-between; font-size: 11px; color: rgba(238, 240, 231, .6); }
+
+    .cmp-head { margin: 24px 0 12px; }
+    .cmp-head h2 { font-size: 17px; letter-spacing: -.02em; }
+    #replaceBox { font-size: 12px; color: var(--muted); margin-top: 3px; }
+    #replaceBox b { color: var(--ink-2); font-weight: 600; }
+    .fl { display: flex; justify-content: space-between; align-items: baseline; font-size: 12px; font-weight: 600; color: var(--ink); margin: 18px 0 7px; }
+    .fl small { font-weight: 400; color: var(--muted); font-size: 11px; }
+
+    .types { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+    .type {
+      display: flex; align-items: center; gap: 9px; padding: 10px 11px; border-radius: 12px; border: 1px solid var(--line-2);
+      background: #fff; font-weight: 600; font-size: 12.5px; text-align: left; transition: background .15s, border-color .15s, color .15s;
+    }
+    .type:hover { border-color: #bdbaac; }
+    .type .te { font-size: 15px; width: 20px; text-align: center; }
+    .type.active { background: var(--forest-2); border-color: var(--forest-2); color: #f1f3ea; }
+
+    .composer .control { padding: 10px 12px; font-size: 13px; border-radius: 11px; background-color: #fff; }
+    .composer select.control { padding-right: 36px; background-position: right 12px center; }
+    .composer textarea.control { min-height: 92px; }
+    .stack2 { display: grid; gap: 6px; }
+    .roads { display: flex; flex-wrap: wrap; gap: 6px; }
+    .road-chip {
+      display: inline-flex; align-items: center; gap: 7px; padding: 6px 11px 6px 9px; border-radius: 999px; border: 1px solid var(--line-2);
+      background: #fff; font-size: 12px; cursor: pointer; user-select: none; transition: all .15s;
+    }
+    .road-chip input { display: none; }
+    .road-chip .box { width: 14px; height: 14px; border-radius: 4px; border: 1.5px solid var(--line-2); display: grid; place-items: center; color: transparent; }
+    .road-chip.on { border-color: var(--red); background: var(--red-soft); }
+    .road-chip.on .box { background: var(--red); border-color: var(--red); color: #fff; }
+    .road-chip .st { font-size: 10.5px; color: var(--muted); }
+    .road-chip .st.closed { color: var(--red); }
+    .road-chip .st.restricted { color: var(--orange); }
+    .freq { display: flex; gap: 6px; align-items: center; }
+    .freq button { flex: 1; border: 1px solid var(--line-2); background: #fff; border-radius: 10px; padding: 8px 0; font-size: 12px; font-weight: 500; }
+    .freq button.active { background: var(--forest-2); color: #f1f3ea; border-color: var(--forest-2); }
+    .freq input { width: 70px; flex: none; text-align: center; padding: 8px 6px !important; }
+    .cmp-foot { flex: none; padding: 12px 18px 16px; border-top: 1px solid var(--line); }
+    .cmp-foot .btn { width: 100%; padding: 13px 16px; font-size: 14px; border-radius: 12px; }
+    #publishMsg { font-size: 12px; margin-top: 8px; }
+    #publishMsg:empty { display: none; }
+
+    /* ---------- Stacked layout ---------- */
+    @media (max-width: 1100px) {
+      body { height: auto; overflow: auto; display: flex; flex-direction: column; gap: 12px; padding: 12px; }
+      .rail { display: contents; }
+      .rail-top { order: 1; }
+      .sitline { order: 2; position: static; flex-wrap: wrap; }
+      #map { order: 3; position: relative; inset: auto; height: 58vh; min-height: 360px; border-radius: 18px; overflow: hidden; box-shadow: var(--shadow); }
+      .legend-wrap { order: 4; position: static; flex-direction: column; }
+      .composer { order: 5; position: static; width: auto; border: 1px solid var(--line); border-radius: 18px; box-shadow: var(--shadow); }
+      .cmp-scroll { overflow: visible; }
+      .feed { order: 6; max-height: 72vh; }
+      .undo { left: 50%; bottom: 22px; }
+      .planner { position: fixed; inset: 0; border-radius: 0; z-index: 2000; }
+      .planner-head p { display: none; }
+      .planner-head .hbtn .lbl-full { display: none; }
+    }
   </style>
 </head>
 <body>
-  <header>
-    <h1>🖥️ SURGE Government Dashboard</h1>
-    <span class="muted" id="status">loading…</span>
-    <span style="margin-left:auto" class="muted">area:</span>
-    <select id="areaSelect"></select>
-  </header>
+  <div id="map"></div>
 
-  <div class="layout">
-    <div class="col">
-      <div class="card">
-        <h3>Areas (ranked by priority)</h3>
-        <div id="areaList"></div>
+  <div class="rail">
+    <section class="glass rail-top">
+      <div class="brand-row">
+        <a class="logo" href="/" aria-label="SURGE home" id="logo"></a>
+        <span class="word" id="wordmark"></span><span class="gov">Gov</span>
+        <span class="tools">
+          <a class="tool" href="victim.html" target="_blank" rel="noopener" title="Open resident app" aria-label="Open resident app"><span data-icon="phone"></span></a>
+          <button class="tool" type="button" data-planner title="Route planner" aria-label="Open route planner"><span data-icon="route"></span></button>
+        </span>
       </div>
 
-      <div class="card">
-        <h3>Publish / update directive</h3>
-        <label>Instruction type</label>
-        <select id="instrType">
-          <option value="evacuate">evacuate</option>
-          <option value="shelter_in_place">shelter_in_place</option>
-          <option value="advisory">advisory</option>
-          <option value="all_clear">all_clear</option>
-        </select>
-        <label>Message (the context pushed to residents + agent)</label>
-        <textarea id="msg" rows="3">Evacuate affected wards immediately using the approved route.</textarea>
-        <div id="evacFields">
-          <label>Shelter</label>
-          <select id="shelter"></select>
-          <label>Approved route</label>
-          <select id="route"></select>
+      <div class="area-field">
+        <select class="control" id="areaSelect" aria-label="Area"></select>
+        <span id="areaHint"></span>
+      </div>
+
+      <div class="lbl pq-head">Priority</div>
+      <div id="areaList"><div class="empty">Loading areas…</div></div>
+    </section>
+
+    <section class="glass feed">
+      <div class="feed-head">
+        <div class="seg" id="feedTabs">
+          <button data-f="reports" class="active">Reports <b id="nReports">—</b></button>
+          <button data-f="activity">Activity <b id="nEvents">—</b></button>
         </div>
-        <label>Roads to avoid</label>
-        <select id="roads" multiple size="2"></select>
-        <label>Next update (minutes)</label>
-        <input id="freq" type="number" value="60" />
-        <button class="primary" id="publishBtn">Publish directive</button>
-        <div id="publishMsg" class="muted"></div>
+        <div class="kinds" id="kinds"></div>
       </div>
-
-      <div class="card">
-        <h3>Operational events</h3>
-        <div id="events"></div>
-      </div>
-    </div>
-
-    <div class="col">
-      <div id="map"></div>
-      <div class="card">
-        <h3>Incoming community reports</h3>
-        <div id="reports"></div>
-      </div>
-    </div>
+      <div class="feed-list" id="feed"><div class="empty">Loading…</div></div>
+    </section>
   </div>
 
-  <script src="common.js"></script>
+  <div class="glass sitline">
+    <div id="sitline"><span class="where">—</span></div>
+    <span class="live-state" title="Data refreshes every 3 seconds"><span class="sys-dot" id="sysDot"></span><span id="status">Connecting…</span></span>
+  </div>
+  <div class="legend-wrap">
+    <div class="map-btns">
+      <button class="glass key-btn" id="keyBtn" aria-expanded="false" aria-controls="legend"><span data-icon="map"></span>Layers</button>
+      <button class="glass key-btn" id="iconsBtn" type="button" aria-pressed="false" title="Show only routes and the area zone"><span data-icon="eye"></span><span id="iconsLbl">Hide icons</span></button>
+      <button class="glass key-btn" type="button" data-planner aria-controls="planner"><span data-icon="route"></span>Route planner</button>
+    </div>
+    <div class="glass legend" id="legend" hidden>
+      <div class="lbl">Show on map</div>
+      <div id="layerRows"></div>
+      <div id="layerNote"></div>
+    </div>
+  </div>
+  <div class="undo" id="undo" role="status" aria-live="polite"><span id="undoMsg"></span><button type="button" id="undoBtn">Undo</button></div>
+
+  <aside class="composer" id="form">
+    <div class="cmp-scroll">
+      <section class="live" id="live"></section>
+
+      <div class="cmp-head">
+        <h2>New directive</h2>
+        <div id="replaceBox"></div>
+      </div>
+
+      <div class="types" id="types" role="radiogroup" aria-label="Instruction type"></div>
+
+      <label class="fl" for="msg">Message <small id="msgLen"></small></label>
+      <textarea class="control" id="msg" rows="3" maxlength="2000"></textarea>
+
+      <div id="evacFields">
+        <div class="fl">Shelter &amp; route</div>
+        <div class="stack2">
+          <select class="control" id="shelter" aria-label="Shelter"></select>
+          <select class="control" id="route" aria-label="Approved route"></select>
+        </div>
+      </div>
+
+      <div class="fl">Roads to avoid <small id="roadsSel"></small></div>
+      <div class="roads" id="roads"><span class="muted small">Loading roads…</span></div>
+
+      <div class="fl">Next update</div>
+      <div class="freq" id="freqRow">
+        <button type="button" data-m="15">15m</button>
+        <button type="button" data-m="30">30m</button>
+        <button type="button" data-m="60">1h</button>
+        <button type="button" data-m="180">3h</button>
+        <input class="control" id="freq" type="number" min="1" max="10080" value="60" aria-label="Minutes until next update" />
+      </div>
+      <div style="height:12px"></div>
+    </div>
+    <div class="cmp-foot">
+      <button class="btn btn-primary" id="publishBtn">Publish to residents</button>
+      <div id="publishMsg"></div>
+    </div>
+  </aside>
+
+  <section class="planner" id="planner" role="dialog" aria-modal="false" aria-labelledby="plannerTitle" inert>
+    <header class="planner-head">
+      <span class="ic"><span data-icon="route"></span></span>
+      <div>
+        <h2 id="plannerTitle">Route planner</h2>
+        <p>Rasuwa / Gosaikunda · ward risk, mapped roads, walking and vehicle routes</p>
+      </div>
+      <div class="acts">
+        <a class="hbtn" href="rasuwa/" target="_blank" rel="noopener"><span data-icon="external"></span><span class="lbl-full">Full page</span></a>
+        <button class="hbtn icon-only" type="button" id="plannerClose" aria-label="Close route planner" title="Close (Esc)"><span data-icon="x"></span></button>
+      </div>
+    </header>
+  </section>
+
+  <script src="common.js?v=brand3"></script>
   <script>
-    let current = "sunsari";
-    let map, layer, detailCache = {};
+    const $ = (id) => document.getElementById(id);
+    const state = {
+      current: "sunsari", dash: null, details: {}, reports: [], status: null,
+      instType: "evacuate", msgDirty: false, mapSig: "", feed: "reports", kind: "all",
+    };
+    let map, markers = {};
+    const groups = {};
 
-    function initMap() {
-      map = L.map("map").setView(AREA_CENTERS[current], 12);
-      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-        maxZoom: 19, attribution: "© OpenStreetMap",
-      }).addTo(map);
-      layer = L.layerGroup().addTo(map);
-    }
-
-    function fillAreaSelect() {
-      const sel = document.getElementById("areaSelect");
-      sel.innerHTML = AREAS.map(a => `<option value="${a}">${AREA_LABELS[a]}</option>`).join("");
-      sel.value = current;
-      sel.onchange = () => { current = sel.value; onAreaChange(); };
-    }
-
-    async function onAreaChange() {
-      map.setView(AREA_CENTERS[current], 12);
-      await loadDetail();
-      await refresh();
-      document.querySelectorAll(".area-row").forEach(r =>
-        r.classList.toggle("active", r.dataset.area === current));
-    }
-
-    async function loadDetail() {
-      const d = await api(`/api/areas/${current}`);
-      detailCache[current] = d;
-      // Populate publish form dropdowns from the area catalog.
-      document.getElementById("shelter").innerHTML =
-        d.shelters.map(s => `<option value="${s.id}">${s.name}</option>`).join("");
-      document.getElementById("route").innerHTML =
-        d.routes.map(r => `<option value="${r.id}">${r.name}</option>`).join("");
-      document.getElementById("roads").innerHTML =
-        d.roads.map(r => `<option value="${r.id}">${r.name} (${r.status})</option>`).join("");
-    }
-
-    function renderAreaList(areas) {
-      const el = document.getElementById("areaList");
-      el.innerHTML = areas.map(a => `
-        <div class="area-row ${a.area_id === current ? "active" : ""}" data-area="${a.area_id}">
-          <span>${a.name}</span>
-          <span>
-            <span class="pill sev-${a.risk.risk_level}">${a.risk.risk_level}</span>
-            <span class="pill sev-${a.priority.priority_level}">${a.priority.priority_level}</span>
-          </span>
-        </div>`).join("");
-      el.querySelectorAll(".area-row").forEach(r =>
-        r.onclick = () => { current = r.dataset.area; document.getElementById("areaSelect").value = current; onAreaChange(); });
-    }
-
-    function drawMap(mapData, detail) {
-      layer.clearLayers();
-      (detail.shelters || []).forEach(s => {
-        if (s.location) L.marker([s.location.coordinates[1], s.location.coordinates[0]], { icon: emojiIcon(MARKERS.shelter) })
-          .bindPopup("Shelter: " + s.name).addTo(layer);
-      });
-      (detail.hospitals || []).forEach(h => {
-        if (h.location) L.marker([h.location.coordinates[1], h.location.coordinates[0]], { icon: emojiIcon(MARKERS.hospital) })
-          .bindPopup("Hospital: " + h.name).addTo(layer);
-      });
-      (mapData.closed_roads || []).forEach(r => {
-        if (r.geometry) L.marker([r.geometry.coordinates[1], r.geometry.coordinates[0]], { icon: emojiIcon(MARKERS.closed_road) })
-          .bindPopup("Closed road: " + r.name).addTo(layer);
-      });
-      if (mapData.approved_route && mapData.approved_route.geometry) {
-        const coords = mapData.approved_route.geometry.coordinates.map(c => [c[1], c[0]]);
-        L.polyline(coords, { color: "#4b7bec", weight: 5 }).bindPopup("Route: " + mapData.approved_route.name).addTo(layer);
-      }
-      (mapData.reports || []).forEach(rep => {
-        const c = rep.location.coordinates;
-        L.marker([c[1], c[0]], { icon: emojiIcon(reportEmoji(rep.kind)) })
-          .bindPopup(`<b>${rep.kind}</b><br>${rep.message}`).addTo(layer);
-      });
-    }
-
-    function renderReports(reports) {
-      document.getElementById("reports").innerHTML = reports.length
-        ? reports.map(r => `<div class="report"><span class="k">${reportEmoji(r.kind)} ${r.kind}</span>
-            — ${r.message}<br><span class="muted">${r.location.coordinates[1].toFixed(4)}, ${r.location.coordinates[0].toFixed(4)} · ${r.verification_state}</span></div>`).join("")
-        : `<div class="muted">No reports yet.</div>`;
-    }
-
-    function renderEvents(events) {
-      document.getElementById("events").innerHTML = events.length
-        ? events.map(e => `<div class="report"><span class="k">${e.kind}</span> — ${e.summary}</div>`).join("")
-        : `<div class="muted">No events yet.</div>`;
-    }
-
-    async function refresh() {
-      try {
-        const dash = await api("/api/government/dashboard");
-        renderAreaList(dash.areas);
-        renderEvents(dash.events);
-        document.getElementById("status").textContent =
-          `publication_state: ${dash.freshness.publication_state}`;
-        const mapData = await api(`/api/public/map/${current}`);
-        const detail = detailCache[current] || await api(`/api/areas/${current}`);
-        drawMap(mapData, detail);
-        const rep = await api(`/api/government/reports?area_id=${current}`);
-        renderReports(rep.reports);
-      } catch (e) {
-        document.getElementById("status").innerHTML = `<span class="err">${e.message}</span>`;
-      }
-    }
-
-    document.getElementById("instrType").onchange = (e) => {
-      document.getElementById("evacFields").style.display =
-        e.target.value === "evacuate" ? "block" : "none";
+    document.querySelectorAll("[data-icon]").forEach((el) => { el.innerHTML = icon(el.dataset.icon, 16); });
+    $("logo").innerHTML = LOGO_SVG;
+    $("wordmark").innerHTML = wordmark();
+    $("keyBtn").onclick = () => {
+      const open = $("legend").hidden;
+      $("legend").hidden = !open;
+      $("keyBtn").setAttribute("aria-expanded", String(open));
     };
 
-    document.getElementById("publishBtn").onclick = async () => {
-      const type = document.getElementById("instrType").value;
+    // ---------- Map layers ----------
+    const LAYERS = [
+      ["route", '<i class="lg lg-route"></i>', "Approved route", ""],
+      ["zone", '<i class="zone-sw"></i>', "Area risk zone", ""],
+      ["shelter", "🏠", "Shelters", ""],
+      ["hospital", "➕", "Hospitals", ""],
+      ["closure", "❌", "Closed roads", ""],
+      ["report", "🆘", "Open reports", "🆘 rescue · 🚧 road hazard · 👁️ person seen"],
+      ["dismissed", "✅", "Dismissed cases", "Helped, duplicate or false reports"],
+    ];
+    const ICON_LAYERS = ["shelter", "hospital", "closure", "report", "dismissed"];
+    const LAYER_DEFAULTS = { route: true, zone: true, shelter: true, hospital: true, closure: true, report: true, dismissed: false };
+    const prefs = (() => {
+      try { return { ...LAYER_DEFAULTS, ...JSON.parse(localStorage.getItem("surge.gov.layers") || "{}") }; }
+      catch { return { ...LAYER_DEFAULTS }; }
+    })();
+    state.iconsOff = localStorage.getItem("surge.gov.iconsOff") === "1";
+
+    $("layerRows").innerHTML = LAYERS.map(([k, mark, label, sub]) => `
+      <label class="lt" data-layer="${k}"><span class="le">${mark}</span>
+        <span><b>${esc(label)}</b>${sub ? `<small>${esc(sub)}</small>` : ""}</span>
+        <input class="sw-toggle" type="checkbox" data-layer="${k}" aria-label="Show ${esc(label.toLowerCase())}" /></label>`).join("");
+
+    function applyLayers() {
+      Object.entries(groups).forEach(([k, g]) => {
+        const on = prefs[k] && !(state.iconsOff && ICON_LAYERS.includes(k));
+        if (on && !map.hasLayer(g)) g.addTo(map);
+        if (!on && map.hasLayer(g)) map.removeLayer(g);
+      });
+      $("layerRows").querySelectorAll(".lt").forEach((row) => {
+        const k = row.dataset.layer;
+        row.querySelector("input").checked = prefs[k];
+        row.classList.toggle("masked", state.iconsOff && ICON_LAYERS.includes(k));
+      });
+      groups.zone && groups.zone.eachLayer((l) => l.bringToBack && l.bringToBack());
+      $("iconsBtn").setAttribute("aria-pressed", String(state.iconsOff));
+      $("iconsLbl").textContent = state.iconsOff ? "Show icons" : "Hide icons";
+      $("layerNote").textContent = state.iconsOff ? "Icons hidden: showing routes and the area zone only." : "";
+    }
+    function setPref(k, on) {
+      prefs[k] = on;
+      if (on && ICON_LAYERS.includes(k)) state.iconsOff = false;
+      localStorage.setItem("surge.gov.layers", JSON.stringify(prefs));
+      localStorage.setItem("surge.gov.iconsOff", state.iconsOff ? "1" : "0");
+      applyLayers();
+      if (k === "dismissed") renderFeed();
+    }
+    $("layerRows").addEventListener("change", (e) => {
+      if (e.target.dataset.layer) setPref(e.target.dataset.layer, e.target.checked);
+    });
+    $("iconsBtn").onclick = () => {
+      state.iconsOff = !state.iconsOff;
+      localStorage.setItem("surge.gov.iconsOff", state.iconsOff ? "1" : "0");
+      applyLayers();
+    };
+
+    // ---------- Case status ----------
+    const DONE = ["resolved", "duplicate", "false_report"];
+    const isDone = (r) => DONE.includes(r.verification_state);
+    const STATE_DONE_MSG = {
+      resolved: "Marked as helped", duplicate: "Marked as duplicate",
+      false_report: "Marked as false report", reviewed: "Case reopened",
+    };
+    let undoTimer;
+    function showUndo(message, undo) {
+      $("undoMsg").textContent = message;
+      $("undo").classList.add("show");
+      $("undoBtn").onclick = () => { $("undo").classList.remove("show"); undo(); };
+      clearTimeout(undoTimer);
+      undoTimer = setTimeout(() => $("undo").classList.remove("show"), 6000);
+    }
+    async function setReportState(id, next, { offerUndo = true } = {}) {
+      const r = state.reports.find((x) => x.report_id === id);
+      const prev = r ? r.verification_state : null;
+      if (r) { r.verification_state = next; renderFeed(); renderSitline(); }
+      try {
+        await api(`/api/government/reports/${encodeURIComponent(id)}`, {
+          method: "PATCH", body: JSON.stringify({ verification_state: next }),
+        });
+        if (offerUndo && prev && prev !== next) {
+          showUndo(STATE_DONE_MSG[next] || "Case updated", () => setReportState(id, prev, { offerUndo: false }));
+        }
+        refresh();
+      } catch (e) {
+        if (r) { r.verification_state = prev; renderFeed(); renderSitline(); }
+        toast(e.message, { error: true });
+      }
+    }
+    document.addEventListener("click", (e) => {
+      const b = e.target.closest("[data-act]");
+      if (!b) return;
+      map.closePopup();
+      setReportState(b.dataset.id, b.dataset.act);
+    });
+    function reportPopup(r) {
+      const id = esc(r.report_id);
+      const acts = isDone(r)
+        ? `<button type="button" data-act="reviewed" data-id="${id}">↺ Reopen case</button>`
+        : `<button type="button" class="primary" data-act="resolved" data-id="${id}">✓ Helped</button>
+           <button type="button" data-act="duplicate" data-id="${id}">Duplicate</button>
+           <button type="button" data-act="false_report" data-id="${id}">False report</button>`;
+      return `<b>${reportEmoji(r.kind)} ${esc(reportInfo(r.kind).label)}</b><br>${esc(r.message)}<br>
+        <span class="muted">${esc(VERIFICATION[r.verification_state] || r.verification_state)}</span><div class="pop-acts">${acts}</div>`;
+    }
+
+    // The planner is its own MapLibre app; it loads on first open and keeps its state while hidden.
+    function setPlanner(open) {
+      const sheet = $("planner");
+      if (open && !sheet.querySelector("iframe")) {
+        const frame = document.createElement("iframe");
+        frame.src = "rasuwa/?embed=1";
+        frame.title = "Rasuwa route planner";
+        sheet.appendChild(frame);
+      }
+      sheet.classList.toggle("open", open);
+      sheet.inert = !open;
+      document.querySelectorAll("[data-planner]").forEach((b) => b.setAttribute("aria-expanded", String(open)));
+      if (location.hash !== (open ? "#planner" : "")) history.replaceState(null, "", open ? "#planner" : location.pathname + location.search);
+      if (open) $("plannerClose").focus();
+    }
+    document.querySelectorAll("[data-planner]").forEach((b) => {
+      b.onclick = () => setPlanner(!$("planner").classList.contains("open"));
+    });
+    $("plannerClose").onclick = () => setPlanner(false);
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && $("planner").classList.contains("open")) setPlanner(false);
+    });
+    if (location.hash === "#planner") setPlanner(true);
+
+    const TONE_HEX = { red: "#a33b32", orange: "#a95e22", olive: "#66722a", teal: "#3c7468", violet: "#6b4f8e", neutral: "#6c7166" };
+    const TYPE_EMOJI = { evacuate: "🏃", shelter_in_place: "🏠", advisory: "⚠️", all_clear: "✅" };
+    const EVENT_META = {
+      publication: ["📢", "Instruction published"],
+      distress_report: ["🆘", "Distress report"],
+      road_closure: ["🚧", "Road report"],
+      model_refresh: ["🔄", "Models refreshed"],
+      report_update: ["✅", "Case updated"],
+    };
+    const isDesktop = () => window.matchMedia("(min-width: 1101px)").matches;
+
+    function fmtAgo(iso) {
+      const s = Math.max(0, (Date.now() - new Date(iso)) / 1000);
+      if (s < 45) return "just now";
+      if (s < 3600) return `${Math.round(s / 60)} min ago`;
+      if (s < 86400) { const h = Math.floor(s / 3600), m = Math.round((s % 3600) / 60); return m ? `${h} h ${m} min ago` : `${h} h ago`; }
+      return fmtWhen(iso);
+    }
+
+    function emojiPin(kind, { dim = false, extra = "" } = {}) {
+      const emoji = { shelter: MARKERS.shelter, hospital: MARKERS.hospital, closure: MARKERS.closed_road }[kind] || reportEmoji(kind);
+      return L.divIcon({
+        html: `<div class="emoji-pin ep-${kind} ${dim ? "ep-dim" : ""} ${extra}">${emoji}</div>`,
+        className: "map-pin-wrap", iconSize: [30, 30], iconAnchor: [15, 15], popupAnchor: [0, -15],
+      });
+    }
+
+    async function getDetail(areaId) {
+      if (!state.details[areaId]) state.details[areaId] = await api(`/api/areas/${areaId}`);
+      return state.details[areaId];
+    }
+
+    // ---------- Priority list ----------
+    function renderAreas() {
+      if (!state.dash) return;
+      $("areaList").innerHTML = state.dash.areas.map((a, i) => {
+        const risk = riskInfo(a.risk.risk_level);
+        const pri = priorityInfo(a.priority.priority_level);
+        const inst = a.current_instruction_type
+          ? `${TYPE_EMOJI[a.current_instruction_type] || ""} ${instructionInfo(a.current_instruction_type).label}`
+          : "No instruction";
+        return `<button class="pq ${a.area_id === state.current ? "active" : ""}" data-area="${esc(a.area_id)}" title="${esc(pri.label)} · ${esc(pri.note)}">
+          <span class="pq-rank">${i + 1}</span>
+          <span style="min-width:0"><span class="pq-name">${esc(a.name)}</span><span class="pq-sub">${esc(inst)}</span></span>
+          <span class="risk" style="color:${TONE_HEX[risk.tone]}"><i></i>${esc(risk.label)}</span>
+        </button>`;
+      }).join("");
+    }
+
+    // ---------- Situation line ----------
+    function renderSitline(detail = state.detail) {
+      if (!detail) return;
+      const a = state.dash && state.dash.areas.find((x) => x.area_id === state.current);
+      const risk = riskInfo(a ? a.risk.risk_level : null);
+      const sos = state.reports.filter((r) => r.kind === "rescue_needed" && !isDone(r));
+      const open = sos.filter((r) => r.verification_state === "unverified").length;
+      const closed = detail.roads.filter((r) => r.status === "closed").length;
+      $("sitline").innerHTML = `
+        <span class="where">${esc(AREA_LABELS[state.current])}</span>
+        <span class="risk" style="color:${TONE_HEX[risk.tone]}"><i></i>${esc(risk.label)} risk</span>
+        <span><b>${sos.length}</b> ${sos.length === 1 ? "rescue request" : "rescue requests"}${open ? ` · ${open} new` : ""}</span>
+        <span><b>${closed}</b>of ${detail.roads.length} roads closed</span>`;
+    }
+
+    // ---------- Feed ----------
+    const KINDS = [["all", "All"], ["rescue_needed", "🆘"], ["road_hazard", "🚧"], ["rescue_seen", "👁️"]];
+    function renderFeed() {
+      const open = state.reports.filter((r) => !isDone(r));
+      const nDismissed = state.reports.length - open.length;
+      const reps = prefs.dismissed ? state.reports : open;
+      const evs = state.dash ? state.dash.events : [];
+      $("nReports").textContent = open.length;
+      $("nEvents").textContent = evs.length;
+      $("feedTabs").querySelectorAll("button").forEach((b) => b.classList.toggle("active", b.dataset.f === state.feed));
+      $("kinds").hidden = state.feed !== "reports";
+
+      if (state.feed === "reports") {
+        $("kinds").innerHTML = KINDS.map(([k, label]) => {
+          const n = k === "all" ? reps.length : reps.filter((r) => r.kind === k).length;
+          return `<button class="${state.kind === k ? "active" : ""}" data-k="${k}" title="${k === "all" ? "All reports" : esc(reportInfo(k).label)}">${label} <span>${n}</span></button>`;
+        }).join("");
+        const list = state.kind === "all" ? reps : reps.filter((r) => r.kind === state.kind);
+        const rows = list.map((r) => {
+          const [lng, lat] = r.location.coordinates;
+          const vs = r.verification_state;
+          const id = esc(r.report_id);
+          const act = isDone(r)
+            ? `<button type="button" class="fa" data-act="reviewed" data-id="${id}" title="Reopen case" aria-label="Reopen case">${icon("refresh", 14, 2)}</button>`
+            : `<button type="button" class="fa" data-act="resolved" data-id="${id}" title="Mark as helped" aria-label="Mark as helped">${icon("check", 14, 2.4)}</button>`;
+          return `<div class="fr ${isDone(r) ? "done" : ""}">
+            <button class="fi" data-id="${id}" data-lat="${lat}" data-lng="${lng}">
+              <span class="fi-ic">${reportEmoji(r.kind)}</span>
+              <span style="min-width:0"><span class="fi-msg">${esc(r.message)}</span>
+                <span class="fi-meta"><span>${esc(reportInfo(r.kind).label)}</span>·<span>${esc(fmtAgo(r.received_at))}</span>·<span class="vs vs-${esc(vs)}">${esc(VERIFICATION[vs] || vs)}</span></span></span>
+            </button>
+            <span class="fi-acts">${act}</span>
+          </div>`;
+        }).join("");
+        const foot = nDismissed
+          ? `<button type="button" class="fi-foot" id="dismissedToggle">${prefs.dismissed ? "Hide" : "Show"} ${nDismissed} dismissed ${nDismissed === 1 ? "case" : "cases"}</button>`
+          : "";
+        $("feed").innerHTML = (rows || `<div class="empty">No open reports in ${esc(AREA_LABELS[state.current])}.</div>`) + foot;
+      } else {
+        $("feed").innerHTML = evs.length ? evs.map((e) => {
+          const [em, title] = EVENT_META[e.kind] || ["•", e.kind.replace(/_/g, " ")];
+          const area = e.area_id ? AREA_LABELS[e.area_id] || e.area_id : "All areas";
+          const summary = e.summary.replace(/_/g, " ").replace(/ (?:for|in) [a-z ]+$/, "");
+          return `<div class="fi"><span class="fi-ic">${em}</span><span style="min-width:0">
+            <span class="fi-msg">${esc(title)} · ${esc(area)}</span>
+            <span class="fi-meta"><span>${esc(summary)}</span>·<span title="${esc(fmtWhen(e.created_at))}">${esc(fmtAgo(e.created_at))}</span></span></span></div>`;
+        }).join("") : `<div class="empty">No activity yet.</div>`;
+      }
+    }
+    $("feedTabs").addEventListener("click", (e) => {
+      const b = e.target.closest("button");
+      if (b) { state.feed = b.dataset.f; renderFeed(); }
+    });
+    $("kinds").addEventListener("click", (e) => {
+      const b = e.target.closest("button");
+      if (b) { state.kind = b.dataset.k; renderFeed(); }
+    });
+    $("feed").addEventListener("click", (e) => {
+      if (e.target.closest("#dismissedToggle")) { setPref("dismissed", !prefs.dismissed); return; }
+      const b = e.target.closest("button.fi");
+      if (!b) return;
+      map.flyTo([+b.dataset.lat, +b.dataset.lng], 15, { duration: 0.6 });
+      const m = markers[b.dataset.id];
+      if (m) setTimeout(() => m.openPopup(), 650);
+      if (!isDesktop()) $("map").scrollIntoView({ behavior: "smooth", block: "center" });
+    });
+
+    // ---------- Live instruction ----------
+    function renderLive() {
+      const inst = state.status && state.status.instruction;
+      const area = esc(AREA_LABELS[state.current]);
+      if (!inst) {
+        $("live").innerHTML = `<div class="lbl"><span class="beacon calm"></span>Live now · ${area}</div>
+          <h3>No active instruction</h3><p>Residents in ${area} haven't received an official instruction yet.</p>`;
+        return;
+      }
+      const info = instructionInfo(inst.instruction_type);
+      const facts = [];
+      if (inst.instruction_type === "evacuate" && inst.shelter) facts.push(["🏠", `Go to ${inst.shelter.name}`]);
+      if (inst.instruction_type === "evacuate" && inst.approved_route) facts.push(["🧭", `Via ${inst.approved_route.name}`]);
+      if (inst.roads_to_avoid && inst.roads_to_avoid.length) facts.push(["❌", `Avoid ${inst.roads_to_avoid.map((r) => r.name).join(", ")}`]);
+      const calm = inst.instruction_type === "all_clear" || inst.instruction_type === "advisory";
+      $("live").innerHTML = `
+        <div class="lbl"><span class="beacon ${calm ? "calm" : ""}"></span>Live now · ${area}</div>
+        <h3>${TYPE_EMOJI[inst.instruction_type] || ""} ${esc(info.label)}<span class="sev">${esc(inst.severity)}</span></h3>
+        <p>${esc(inst.emergency_message)}</p>
+        ${facts.length ? `<div class="facts">${facts.map(([e, t]) => `<div><span>${e}</span><span>${esc(t)}</span></div>`).join("")}</div>` : ""}
+        <div class="foot"><span>Published ${esc(fmtAgo(inst.published_at))}</span><span>${inst.next_update_at ? "Next update " + esc(fmtClock(inst.next_update_at)) : ""}</span></div>`;
+    }
+
+    // ---------- Map ----------
+    function fitPadding() {
+      return isDesktop()
+        ? { paddingTopLeft: [document.querySelector(".rail").offsetWidth + 50, 90], paddingBottomRight: [50, 70] }
+        : { padding: [30, 30] };
+    }
+    function drawMap(mapData, detail, fit) {
+      const sig = JSON.stringify([mapData.current_instruction_id, mapData.reports, mapData.closed_roads, mapData.risk_level]);
+      if (sig === state.mapSig && !fit) return;
+      state.mapSig = sig;
+      Object.values(groups).forEach((g) => g.clearLayers());
+      markers = {};
+      const bounds = [];
+      const add = (group, ll, kind, popup, opts = {}) => {
+        if (!ll) return null;
+        bounds.push(ll);
+        return L.marker(ll, { icon: emojiPin(kind, opts), zIndexOffset: opts.z || 0 }).bindPopup(popup).addTo(groups[group]);
+      };
+      drawAreaZone(groups.zone, mapData.geometry, mapData.risk_level);
+      if (mapData.approved_route) {
+        drawRoute(groups.route, mapData.approved_route.geometry, `<b>🧭 Approved route</b><br>${esc(mapData.approved_route.name)}`);
+        mapData.approved_route.geometry.coordinates.forEach((c) => bounds.push([c[1], c[0]]));
+      }
+      const designated = mapData.shelter && mapData.shelter.id;
+      detail.shelters.forEach((s) => add("shelter", latLng(s.location), "shelter",
+        `<b>🏠 ${esc(s.name)}</b><br>Capacity ${fmtNumber(s.capacity)}${s.id === designated ? "<br><b>Designated for evacuation</b>" : ""}`,
+        { z: s.id === designated ? 500 : 0, extra: s.id === designated ? "designated" : "" }));
+      detail.hospitals.forEach((h) => add("hospital", latLng(h.location), "hospital", `<b>➕ ${esc(h.name)}</b><br>Hospital`));
+      mapData.closed_roads.forEach((r) => add("closure", latLng(r.geometry), "closure", `<b>❌ ${esc(r.name)}</b><br>Closed road`));
+      mapData.reports.forEach((r) => {
+        const done = isDone(r);
+        markers[r.report_id] = add(done ? "dismissed" : "report", latLng(r.location), r.kind, reportPopup(r),
+          { dim: done, z: r.kind === "rescue_needed" ? 1000 : 200 });
+      });
+      groups.zone.eachLayer((l) => l.bringToBack && l.bringToBack());
+      if (fit) {
+        if (bounds.length > 1) map.fitBounds(bounds, { ...fitPadding(), maxZoom: 14 });
+        else map.setView(AREA_CENTERS[state.current], 12);
+      }
+    }
+
+    // ---------- Refresh ----------
+    async function refresh({ fit = false } = {}) {
+      const areaId = state.current;
+      try {
+        const [dash, mapData, detail, rep, status] = await Promise.all([
+          api("/api/government/dashboard"),
+          api(`/api/public/map/${areaId}`),
+          getDetail(areaId),
+          api(`/api/government/reports?area_id=${areaId}&limit=100`),
+          api(`/api/public/status/${areaId}`),
+        ]);
+        if (areaId !== state.current) return;
+        state.dash = dash;
+        state.reports = rep.reports;
+        state.status = status;
+        state.detail = detail;
+        renderAreas();
+        renderSitline(detail);
+        renderFeed();
+        renderLive();
+        renderReplaceBox();
+        drawMap(mapData, detail, fit);
+        const ps = dash.freshness.publication_state;
+        $("status").textContent = ps === "ready" ? `Live · ${fmtClock(dash.updated_at)}` : `Publishing ${ps}`;
+        $("sysDot").className = `sys-dot ${ps === "ready" ? "" : "warn"}`;
+      } catch (e) {
+        $("status").textContent = "Backend unreachable";
+        $("status").title = e.message;
+        $("sysDot").className = "sys-dot bad";
+      }
+    }
+
+    // ---------- Composer ----------
+    const TEMPLATES = {
+      evacuate: (a) => `Evacuate affected wards in ${a} immediately using the approved route to the named shelter. Avoid closed roads.`,
+      shelter_in_place: (a) => `Remain indoors above ground level in ${a}. Keep away from rivers and follow official updates.`,
+      advisory: (a) => `Prepare essential items and monitor official updates. Floodwater may affect low-lying roads in ${a}.`,
+      all_clear: (a) => `Floodwater has receded in ${a}. You may return home with caution. Avoid damaged roads and report hazards.`,
+    };
+
+    $("types").innerHTML = Object.entries(INSTRUCTION).map(([k, v]) =>
+      `<button type="button" class="type" data-type="${k}" role="radio"><span class="te">${TYPE_EMOJI[k]}</span>${esc(v.label)}</button>`).join("");
+    $("types").addEventListener("click", (e) => {
+      const b = e.target.closest(".type");
+      if (b) { setType(b.dataset.type); markDraft(); }
+    });
+
+    function syncMsgLen() {
+      const n = $("msg").value.length;
+      $("msgLen").textContent = n > 1600 ? `${n} / 2000` : "";
+    }
+    function setMsg(text) { $("msg").value = text; syncMsgLen(); }
+
+    function setType(type) {
+      state.instType = type;
+      $("types").querySelectorAll(".type").forEach((b) => {
+        const on = b.dataset.type === type;
+        b.classList.toggle("active", on);
+        b.setAttribute("aria-checked", String(on));
+      });
+      $("evacFields").hidden = type !== "evacuate";
+      if (!state.msgDirty) setMsg(TEMPLATES[type](AREA_LABELS[state.current]));
+      renderReplaceBox();
+    }
+
+    function renderReplaceBox() {
+      const inst = state.status && state.status.instruction;
+      const area = esc(AREA_LABELS[state.current]);
+      $("replaceBox").innerHTML = inst
+        ? `${state.instType === "all_clear" ? "Cancels" : "Replaces"} the live <b>${esc(instructionInfo(inst.instruction_type).label)}</b> for ${area}.`
+        : `First official instruction for ${area}.`;
+    }
+
+    function syncRoadsLabel() {
+      const n = $("roads").querySelectorAll("input:checked").length;
+      $("roadsSel").textContent = n ? `${n} selected` : "none selected";
+    }
+
+    function syncFreq() {
+      const v = String(parseInt($("freq").value || "0", 10));
+      $("freqRow").querySelectorAll("button").forEach((b) => b.classList.toggle("active", b.dataset.m === v));
+    }
+    $("freqRow").addEventListener("click", (e) => {
+      const b = e.target.closest("button");
+      if (!b) return;
+      $("freq").value = b.dataset.m;
+      syncFreq();
+      markDraft();
+    });
+    $("freq").addEventListener("input", syncFreq);
+
+    async function loadForm() {
+      const areaId = state.current;
+      try {
+        const d = await getDetail(areaId);
+        if (areaId !== state.current) return;
+        $("shelter").innerHTML = d.shelters.map((s) => `<option value="${esc(s.id)}">🏠 ${esc(s.name)} — ${fmtNumber(s.capacity)} places</option>`).join("");
+        $("route").innerHTML = d.routes.map((r) => `<option value="${esc(r.id)}">🧭 ${esc(r.name)}</option>`).join("");
+        $("shelter").onchange = () => {
+          const s = d.shelters.find((x) => x.id === $("shelter").value);
+          const end = s && s.location && s.location.coordinates.join();
+          const r = d.routes.find((x) => x.geometry.coordinates.at(-1).join() === end);
+          if (r) $("route").value = r.id;
+        };
+        $("shelter").onchange();
+        $("roads").innerHTML = d.roads.length ? d.roads.map((r) => `
+          <label class="road-chip"><input type="checkbox" value="${esc(r.id)}" ${r.status === "closed" ? "checked" : ""} />
+            <span class="box">${icon("check", 10, 3.5)}</span>${esc(r.name)} <span class="st ${esc(r.status)}">${esc(r.status)}</span></label>`).join("")
+          : `<span class="muted small">No catalogued roads for this area.</span>`;
+        $("roads").querySelectorAll("input").forEach((i) => {
+          const sync = () => { i.parentElement.classList.toggle("on", i.checked); syncRoadsLabel(); };
+          i.onchange = sync; sync();
+        });
+        if (!state.msgDirty) setMsg(TEMPLATES[state.instType](AREA_LABELS[areaId]));
+      } catch (e) {
+        $("publishMsg").innerHTML = `<span class="err">${esc(e.message)}</span>`;
+      }
+    }
+
+    function markDraft() { $("publishMsg").textContent = ""; }
+    $("form").addEventListener("input", markDraft);
+    $("msg").addEventListener("input", () => { state.msgDirty = true; syncMsgLen(); });
+
+    $("publishBtn").onclick = async () => {
+      const type = state.instType;
+      const message = $("msg").value.trim();
+      const out = $("publishMsg");
+      if (!message) { out.innerHTML = `<span class="err">Add a message before publishing.</span>`; return; }
       const body = {
         publication_id: "pub-" + (crypto.randomUUID ? crypto.randomUUID() : Date.now()),
-        area_id: current,
+        area_id: state.current,
         instruction_type: type,
-        emergency_message: document.getElementById("msg").value,
-        roads_to_avoid_ids: [...document.getElementById("roads").selectedOptions].map(o => o.value),
-        update_frequency_minutes: parseInt(document.getElementById("freq").value || "60", 10),
+        emergency_message: message,
+        roads_to_avoid_ids: [...$("roads").querySelectorAll("input:checked")].map((i) => i.value),
+        update_frequency_minutes: parseInt($("freq").value || "60", 10),
       };
       if (type === "evacuate") {
-        body.shelter_id = document.getElementById("shelter").value;
-        body.approved_route_id = document.getElementById("route").value;
+        body.shelter_id = $("shelter").value;
+        body.approved_route_id = $("route").value;
       }
       if (type === "all_clear") {
-        const st = await api(`/api/public/status/${current}`);
-        body.cancels_instruction_id = st.instruction ? st.instruction.publication_id : null;
+        const st = await api(`/api/public/status/${state.current}`).catch(() => null);
+        body.cancels_instruction_id = st && st.instruction ? st.instruction.publication_id : null;
       }
-      const out = document.getElementById("publishMsg");
+      const btn = $("publishBtn");
+      btn.disabled = true;
+      btn.innerHTML = `<span class="spinner"></span>Publishing…`;
       try {
         const res = await api("/api/government/instructions", { method: "POST", body: JSON.stringify(body) });
-        out.innerHTML = `<span class="ok">Published ${res.instruction.instruction_type} (severity ${res.instruction.severity}).</span>`;
+        const label = instructionInfo(res.instruction.instruction_type).label;
+        out.innerHTML = `<span class="ok">${esc(label)} is live for ${esc(AREA_LABELS[state.current])}. Residents are being notified.</span>`;
+        toast(`${label} published for ${AREA_LABELS[state.current]}.`);
+        state.msgDirty = false;
+        state.mapSig = "";
         await refresh();
+        $("live").scrollIntoView({ behavior: "smooth", block: "nearest" });
       } catch (e) {
-        out.innerHTML = `<span class="err">${e.message}</span>`;
+        out.innerHTML = `<span class="err">${esc(e.message)}</span>`;
+      } finally {
+        btn.disabled = false;
+        btn.textContent = "Publish to residents";
       }
     };
 
+    // ---------- Area selection ----------
+    function selectArea(areaId) {
+      if (!AREAS.includes(areaId) || areaId === state.current) return;
+      state.current = areaId;
+      state.mapSig = "";
+      state.status = null;
+      state.reports = [];
+      state.kind = "all";
+      $("areaSelect").value = areaId;
+      $("publishMsg").textContent = "";
+      markDraft();
+      renderAreas();
+      loadForm();
+      refresh({ fit: true });
+    }
+
+    let areaManual = false;
+    function setAreaHint(reason) {
+      const warn = reason === "outside" || reason === "unavailable";
+      $("areaHint").textContent = reason === "manual" ? "" : AREA_HINTS[reason];
+      $("areaHint").classList.toggle("warn", warn);
+      document.querySelector(".area-field").classList.toggle("needs-pick", warn);
+    }
+    const pickManually = () => { areaManual = true; setAreaHint("manual"); };
+
+    $("areaSelect").innerHTML = AREAS.map((a) => `<option value="${a}">${esc(AREA_LABELS[a])}</option>`).join("");
+    $("areaSelect").value = state.current;
+    $("areaSelect").onchange = (e) => { pickManually(); selectArea(e.target.value); };
+    $("areaList").addEventListener("click", (e) => {
+      const row = e.target.closest(".pq");
+      if (row) { pickManually(); selectArea(row.dataset.area); }
+    });
+
+    // ---------- Boot ----------
     (async function () {
-      fillAreaSelect();
-      initMap();
-      document.getElementById("instrType").dispatchEvent(new Event("change"));
-      await loadDetail();
-      await refresh();
+      map = baseMap("map", AREA_CENTERS[state.current], 12);
+      LAYERS.forEach(([k]) => { groups[k] = L.layerGroup(); });
+      applyLayers();
+      setType("evacuate");
+      syncFreq();
+      setAreaHint("detecting");
+      detectArea().then(({ area, reason }) => {
+        if (areaManual) return;
+        setAreaHint(reason);
+        if (area) selectArea(area);
+      });
+      loadForm();
+      await refresh({ fit: true });
       setInterval(refresh, 3000);
     })();
   </script>

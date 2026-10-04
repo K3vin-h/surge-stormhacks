@@ -66,6 +66,24 @@ def submit(req: SubmitReportRequest) -> tuple[Report, bool]:
     return report, True
 
 
+def set_state(report_id: str, state: VerificationState) -> Report | None:
+    row = sf.query_one("SELECT * FROM REPORTS WHERE REPORT_ID = %s", [report_id])
+    if row is None:
+        return None
+    sf.execute(
+        "UPDATE REPORTS SET VERIFICATION_STATE = %s WHERE REPORT_ID = %s",
+        [state.value, report_id],
+    )
+    row["VERIFICATION_STATE"] = state.value
+    report = _row_to_report(row)
+    events.record_event(
+        "report_update",
+        f"{report.kind.value} marked {state.value} in {report.area_id}",
+        report.area_id,
+    )
+    return report
+
+
 def list_reports(
     area_id: str | None = None,
     kind: str | None = None,
