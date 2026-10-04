@@ -4,6 +4,7 @@ Gemini only picks the topic; the operational facts come from the committed
 instruction in the cache. A ready cache with no instruction returns a
 deterministic no-instruction answer.
 """
+
 from __future__ import annotations
 
 import uuid
@@ -31,7 +32,9 @@ def _status_text(inst: PublishedInstruction) -> str:
         if inst.shelter:
             parts.append(f"Go to {inst.shelter.name}.")
     elif inst.instruction_type == InstructionType.all_clear:
-        parts.append("An all-clear has been issued; the prior evacuation route no longer applies.")
+        parts.append(
+            "An all-clear has been issued; the prior evacuation route no longer applies."
+        )
     return " ".join(parts)
 
 
@@ -60,7 +63,9 @@ def _next_update_text(inst: PublishedInstruction) -> str:
     if inst.next_update_at:
         return f"The next official update is expected by {inst.next_update_at.isoformat()}."
     if inst.update_frequency_minutes:
-        return f"Updates are issued about every {inst.update_frequency_minutes} minutes."
+        return (
+            f"Updates are issued about every {inst.update_frequency_minutes} minutes."
+        )
     return f"No next-update time is set. {AUTHORITY_LINE}"
 
 
@@ -86,7 +91,11 @@ def build_context(area_id: str) -> str:
         if inst.approved_route:
             lines.append(f"Approved evacuation route: {inst.approved_route.name}.")
         if inst.roads_to_avoid:
-            lines.append("Roads to avoid: " + ", ".join(r.name for r in inst.roads_to_avoid) + ".")
+            lines.append(
+                "Roads to avoid: "
+                + ", ".join(r.name for r in inst.roads_to_avoid)
+                + "."
+            )
         if inst.next_update_at:
             lines.append(f"Next official update by: {inst.next_update_at.isoformat()}.")
     else:
@@ -130,7 +139,7 @@ def agent_turn(
         reply = _render_text(area_id, topic, inst)
         event_type = gemini.detect_event_keyword(question)
         summary = question.strip()
-        language = language_hint or "en"
+        language = "en"  # the fallback reply is English, whatever the hint says
         mode = "deterministic"
 
     response_id = str(uuid.uuid4())
@@ -142,14 +151,17 @@ def agent_turn(
     if event_type in gemini.REPORT_KINDS and location is not None:
         from ..schemas.common import GeoPoint, ReportKind
         from ..schemas.reports import SubmitReportRequest
+
         lat, lng = location
         try:
-            report, _created = reports_svc.submit(SubmitReportRequest(
-                area_id=area_id,
-                kind=ReportKind(event_type),
-                message=summary or f"{event_type} reported via agent call",
-                location=GeoPoint(coordinates=[lng, lat]),
-            ))
+            report, _created = reports_svc.submit(
+                SubmitReportRequest(
+                    area_id=area_id,
+                    kind=ReportKind(event_type),
+                    message=summary or f"{event_type} reported via agent call",
+                    location=GeoPoint(coordinates=[lng, lat]),
+                )
+            )
             report_filed = True
             report_id = report.report_id
             report_kind = report.kind.value
@@ -175,14 +187,18 @@ def agent_turn(
 
 def _diff_text(prev: PublishedInstruction | None, curr: PublishedInstruction) -> str:
     """Human-readable description of what changed between instructions."""
-    lines = [f"New instruction type: {curr.instruction_type.value}.",
-             f"New message: {curr.emergency_message}"]
+    lines = [
+        f"New instruction type: {curr.instruction_type.value}.",
+        f"New message: {curr.emergency_message}",
+    ]
     if curr.approved_route:
         lines.append(f"New approved route: {curr.approved_route.name}.")
     if curr.shelter:
         lines.append(f"New shelter: {curr.shelter.name}.")
     if curr.roads_to_avoid:
-        lines.append("Now avoid: " + ", ".join(r.name for r in curr.roads_to_avoid) + ".")
+        lines.append(
+            "Now avoid: " + ", ".join(r.name for r in curr.roads_to_avoid) + "."
+        )
     if prev is None:
         lines.append("This is the first official instruction for the area.")
         return "\n".join(lines)
@@ -241,7 +257,9 @@ def render_update_briefing(
         instruction_id=current_inst.publication_id,
         instruction_published_at=current_inst.published_at,
         source="published_instruction",
-        mode="gemini_grounded" if gemini.get_settings().gemini_enabled else "deterministic",
+        mode="gemini_grounded"
+        if gemini.get_settings().gemini_enabled
+        else "deterministic",
         audio_available=True,
         freshness=cache.freshness(area_id),
         language=language,

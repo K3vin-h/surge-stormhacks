@@ -189,6 +189,19 @@ def detect_event_keyword(text: str) -> str:
     return "none"
 
 
+_BCP47 = re.compile(r"^[A-Za-z]{2,3}(-[A-Za-z0-9]{2,8}){0,3}$")
+
+
+def safe_lang(code: str | None) -> str | None:
+    """A client/model-supplied language code, only if it looks like BCP-47.
+
+    The code is interpolated into prompts, so anything else (free text, an
+    injection attempt) is dropped rather than trusted.
+    """
+    code = (code or "").strip()
+    return code if _BCP47.match(code) else None
+
+
 def converse(
     question: str, context_text: str, language_hint: str | None = None
 ) -> dict | None:
@@ -200,6 +213,7 @@ def converse(
     mid-conversation), while `summary` stays in English for responders.
     `language` is the detected BCP-47 code.
     """
+    language_hint = safe_lang(language_hint)
     # The hint is only a tie-breaker: forcing it would trap a caller in the
     # language of an earlier turn when they switch (e.g. English -> Spanish).
     lang_line = (
@@ -245,7 +259,7 @@ def converse(
         "reply": (data.get("reply") or "").strip(),
         "event_type": event,
         "summary": (data.get("summary") or "").strip(),
-        "language": (data.get("language") or "en").strip() or "en",
+        "language": safe_lang(data.get("language")) or "en",
     }
 
 
@@ -266,7 +280,7 @@ def summarize_update(
         "the new action first (e.g. 'Turn back - your route is closed. Use X "
         "instead.'). If the update does not change what they should do, say "
         "that in a few words. Base everything only on the official data below.\n"
-        f"Write your answer in the language with BCP-47 code '{language}'.\n\n"
+        f"Write your answer in the language with BCP-47 code '{safe_lang(language) or 'en'}'.\n\n"
         f"=== WHAT CHANGED ===\n{change_text}\n\n"
         f"=== CURRENT OFFICIAL INSTRUCTION ===\n{context_text}\n=== END ==="
     )
