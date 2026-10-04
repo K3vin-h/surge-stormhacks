@@ -2,6 +2,7 @@ import { test, expect } from '@playwright/test';
 
 test.beforeEach(async ({ page }) => {
   await page.route('https://tile.openstreetmap.org/**', route => route.abort());
+  await page.route('https://tiles.maps.eox.at/**', route => route.abort());
 });
 
 test('SFU campus selection draws a walking route and swap reverses the locations', async ({ page }) => {

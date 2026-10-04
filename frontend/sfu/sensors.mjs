@@ -36,7 +36,7 @@ export function assessRegions(data) {
     return {
       ...region, reading: reading ?? null, risk_level, sensor_score: score === null ? null : Math.round(score * 1000) / 1000,
       status: region.simulated_flood ? 'Simulated flooding' : `${risk_level} risk`,
-      color: region.simulated_flood ? '#c66151' : risk_level === 'Low' ? '#6b9367' : risk_level === 'Unknown' ? '#929b92' : '#caa04c'
+      color: region.simulated_flood ? '#dc2626' : { Low: '#22c55e', Moderate: '#facc15', High: '#f97316', Extreme: '#dc2626', Unknown: '#94a3b8' }[risk_level]
     };
   });
 }

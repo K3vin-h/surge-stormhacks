@@ -28,6 +28,8 @@ The browser calculates the same weighted heuristic used by the regional planners
 
 The map shows colored sectors, a legend, sensor cards, and region-click details. **Avoid simulated flooded areas** is enabled by default. It conservatively blocks an entire mapped path if any segment touches a flooded sector. Destinations in that sector may have no route. Unchecking the option restores ordinary campus walking routes while retaining the flood overlay. Changes to this JSON file are used on reload without rebuilding the campus geography.
 
-Background tiles require internet. Bundled paths, landmarks, and route search remain available if tiles fail. Campus location names can be checked against the [official SFU campus map](https://www.sfu.ca/campuses/maps-and-directions/burnaby-map/).
+The page shares the Sunsari and Rasuwa dashboard shell, planner styles, satellite imagery configuration, risk palette, and sensor-panel layout. SFU retains campus landmark-to-landmark walking routes. A cyan line marks the selected route; a dashed red outline distinguishes simulated flooded sectors.
+
+Satellite background tiles require internet. Bundled paths, landmarks, and route search remain available if tiles fail. Campus location names can be checked against the [official SFU campus map](https://www.sfu.ca/campuses/maps-and-directions/burnaby-map/).
 
 Geographic data © [OpenStreetMap contributors](https://www.openstreetmap.org/copyright), licensed under ODbL 1.0. Dataset source and retrieval timestamp are recorded in the snapshot. MapLibre assets retain their existing license.

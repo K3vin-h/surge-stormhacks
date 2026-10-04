@@ -1,6 +1,7 @@
 import * as maplibre from '../rasuwa/vendor/maplibre-gl.mjs';
 import { campusRoute } from './routing.mjs';
 import { assessRegions, floodedRoadIds } from './sensors.mjs';
+import { mapConfig } from '../rasuwa/config.js';
 
 const element = id => document.getElementById(id);
 const collection = features => ({ type: 'FeatureCollection', features });
@@ -95,7 +96,7 @@ function renderSensors() {
     const card = document.createElement('button');
     card.type = 'button';
     card.className = 'sensor-card';
-    card.style.borderTopColor = region.color;
+    card.style.borderLeftColor = region.color;
     card.append(sensorContent(region));
     card.onclick = () => showRegion(region);
     element('sensor-readings').append(card);
@@ -109,12 +110,12 @@ function createMap() {
     style: {
       version: 8,
       sources: { basemap: {
-        type: 'raster', tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'], tileSize: 256,
-        attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>'
+        type: 'raster', tiles: [mapConfig.satelliteTiles], tileSize: 256,
+        attribution: '<a href="https://cloudless.eox.at">EOxCloudless (Copernicus Sentinel 2025)</a> · © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>'
       } },
       layers: [
         { id: 'background', type: 'background', paint: { 'background-color': '#e8ede3' } },
-        { id: 'basemap', type: 'raster', source: 'basemap', paint: { 'raster-opacity': .7 } }
+        { id: 'basemap', type: 'raster', source: 'basemap', paint: { 'raster-opacity': .85 } }
       ]
     }
   });
@@ -140,11 +141,12 @@ function createMap() {
     map.addSource('route', { type: 'geojson', data: empty });
     map.addLayer({ id: 'risk-regions-fill', type: 'fill', source: 'risk-regions', paint: { 'fill-color': ['get', 'color'], 'fill-opacity': .24 } });
     map.addLayer({ id: 'risk-regions-outline', type: 'line', source: 'risk-regions', paint: { 'line-color': ['get', 'color'], 'line-width': 2, 'line-opacity': .65 } });
+    map.addLayer({ id: 'flood-regions-outline', type: 'line', source: 'risk-regions', filter: ['==', ['get', 'simulated_flood'], true], paint: { 'line-color': '#dc2626', 'line-width': 3, 'line-dasharray': [3, 2] } });
     map.addLayer({ id: 'buildings', type: 'fill', source: 'buildings', paint: { 'fill-color': '#b4bca8', 'fill-opacity': .65 } });
     map.addLayer({ id: 'paths-halo', type: 'line', source: 'paths', paint: { 'line-color': '#fff', 'line-width': 4 } });
     map.addLayer({ id: 'paths', type: 'line', source: 'paths', paint: { 'line-color': '#a7b49c', 'line-width': 2 } });
     map.addLayer({ id: 'route-halo', type: 'line', source: 'route', paint: { 'line-color': '#fff', 'line-width': 8 } });
-    map.addLayer({ id: 'route', type: 'line', source: 'route', paint: { 'line-color': '#327663', 'line-width': 5 } });
+    map.addLayer({ id: 'route', type: 'line', source: 'route', paint: { 'line-color': '#22d3ee', 'line-width': 5 } });
     map.on('click', 'risk-regions-fill', event => {
       const region = regions.find(region => region.id === event.features[0]?.properties.id);
       if (region) showRegion(region, event.lngLat);

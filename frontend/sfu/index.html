@@ -6,32 +6,44 @@
   <title>SURGE — SFU campus walking map</title>
   <link rel="stylesheet" href="../theme.css?v=brand6" />
   <link rel="stylesheet" href="../rasuwa/vendor/maplibre-gl.css" />
+  <link rel="stylesheet" href="../rasuwa/styles.css?v=embed3" />
   <link rel="stylesheet" href="styles.css" />
+  <script>if (new URLSearchParams(location.search).has('embed')) document.documentElement.classList.add('embed');</script>
 </head>
 <body>
-  <header class="campus-header">
-    <a class="brand" href="../">SURGE <span>/ campus maps</span></a>
-    <nav aria-label="Planner navigation">
-      <a href="../gov.html#planner">Government dashboard</a>
-      <a href="../sunsari/">Sunsari</a>
-      <a href="../rasuwa/">Rasuwa</a>
-    </nav>
-  </header>
-  <main>
-    <div class="page-heading">
-      <div><p class="eyebrow">Simon Fraser University · Burnaby</p><h1>A simple way across campus.</h1>
-        <p>8888 University Drive West, Burnaby, BC</p></div>
-      <span class="walking-tag">Walking routes</span>
+  <div class="shell">
+    <aside class="sidebar">
+      <a class="brand" href="../index.html"><span data-logo></span><span data-wordmark></span></a>
+      <nav aria-label="SURGE navigation">
+        <div class="side-label">Operations</div>
+        <a class="nav-item" href="../gov.html"><span data-icon="grid"></span>Dashboard</a>
+        <a class="nav-item" href="../sunsari/"><span data-icon="route"></span>Sunsari planner</a>
+        <a class="nav-item" href="../rasuwa/"><span data-icon="route"></span>Rasuwa planner</a>
+        <a class="nav-item active" href="./" aria-current="page"><span data-icon="route"></span>SFU campus map</a>
+      </nav>
+      <div class="side-spacer"></div>
+      <a class="side-card" href="../victim.html" target="_blank" rel="noopener"><span class="grow">Resident app preview</span><span data-icon="chevronRight"></span></a>
+    </aside>
+    <div class="main">
+      <header class="topbar">
+        <div><div class="eyebrow">Simon Fraser University · Burnaby</div><div class="title">Route planner</div></div>
+        <span class="pill tone-amber"><i class="dot"></i>Sensor JSON + mapped geography</span>
+      </header>
+  <main class="view">
+    <div class="page-head">
+      <div><div class="eyebrow">Campus overview</div><h1>Campus risk &amp; response</h1>
+        <p>Inspect sensor risk and compare walking routes across SFU Burnaby.</p></div>
     </div>
-    <p class="simulation-banner"><strong>Flood simulation.</strong> Fictional sensor readings and flooded sectors for this demo. No live SFU flood observations.</p>
+    <div class="notice simulation"><span data-icon="broadcast"></span><span><b>Hackathon simulation.</b> Real mapped geography; fictional sensor readings and flooded sectors. No live SFU flood observations.</span></div>
     <div id="load-error" role="alert" hidden></div>
-    <div class="campus-layout">
-      <aside class="card route-panel" aria-label="Campus route planning">
-        <h2>Where are you headed?</h2>
+    <div class="workspace">
+      <aside class="card planner" aria-label="Campus route planning">
+        <div class="eyebrow">Route search</div>
+        <h2>Route planning</h2>
         <p class="intro">Pick two campus landmarks to find a mapped walking route.</p>
         <label for="start">Start</label>
         <select id="start" disabled><option>Loading campus…</option></select>
-        <button id="swap" type="button" aria-label="Swap start and destination" disabled>↕ Swap</button>
+        <button id="swap" class="btn btn-ghost btn-sm" type="button" aria-label="Swap start and destination" disabled>↕ Swap</button>
         <label for="destination">Destination</label>
         <select id="destination" disabled><option>Loading campus…</option></select>
         <label class="avoid-floods"><input id="avoid-floods" type="checkbox" checked disabled /> Avoid simulated flooded areas</label>
@@ -39,27 +51,38 @@
           <p id="route-summary">Loading campus paths…</p>
           <strong id="route-distance"></strong>
         </div>
-        <button id="overview" class="overview" type="button" disabled>Campus overview</button>
         <p class="map-note">Routes end at nearby mapped paths. Check campus signs for entrances and temporary closures. Paths may include stairs; indoor floors and step-free access are not covered.</p>
         <a class="official-map" href="https://www.sfu.ca/campuses/maps-and-directions/burnaby-map/" target="_blank" rel="noopener noreferrer">Official SFU campus map ↗</a>
       </aside>
-      <section class="card map-panel" aria-label="SFU Burnaby campus map">
-        <div class="map-heading"><h2>Burnaby campus</h2><span>● Landmarks <i></i> Walking route</span></div>
+      <section class="card map-workspace" aria-label="SFU Burnaby campus map">
+        <div class="map-toolbar"><div><div class="eyebrow">Geographic workspace</div><span>SFU Burnaby · campus walking routes</span></div><button id="overview" class="btn btn-ghost btn-sm" type="button" disabled>Campus overview</button></div>
+        <div class="map-frame"><div id="map" role="region" aria-label="Interactive campus walking map"></div><div id="map-caption">Colored sectors: simulated risk · white dots: campus landmarks</div></div>
+        <p id="map-notice" role="status" hidden></p>
         <div class="risk-legend" aria-label="Campus flood legend">
-          <span><i class="risk-low"></i>Low risk</span>
-          <span><i class="risk-elevated"></i>Elevated risk</span>
-          <span><i class="risk-flooded"></i>Simulated flooding</span>
+          <span><i class="sw sw-extreme"></i>Extreme risk ≥ 0.80</span>
+          <span><i class="sw sw-high"></i>High risk ≥ 0.55</span>
+          <span><i class="sw sw-moderate"></i>Moderate risk ≥ 0.30</span>
+          <span><i class="sw sw-low"></i>Low risk &lt; 0.30</span>
+          <span><i class="sw sw-gray"></i>Gray: no sensor reading</span>
+          <small>Colors show simulated sensor risk. Red sectors with a dashed outline are simulated flooding. Click a region for its readings.</small>
         </div>
-        <div id="map" role="region" aria-label="Interactive campus walking map"></div>
-        <p id="map-notice" class="map-notice" role="status" hidden></p>
+        <p class="note map-key">White lines: mapped campus paths · cyan: selected walking route · flood avoidance is enabled by default.</p>
       </section>
     </div>
-    <section class="sensors-section" aria-label="Simulated campus sensor readings">
-      <div class="sensors-heading"><h2>Campus regions &amp; sensor readings</h2><span>Simulated snapshot</span></div>
-      <p class="sensor-intro">Select a region to inspect it on the map. Water level is compared with a fictional local drainage warning level.</p>
+    <section class="card panel" aria-label="Simulated campus sensor readings">
+      <div class="panel-head"><div><div class="eyebrow">Sensors</div><h2>Regional sensor readings</h2></div><span class="tag">Simulated</span></div>
+      <p class="note">Select a region to inspect it on the map. Water level is compared with a fictional local drainage warning level.</p>
       <div id="sensor-readings" class="sensor-grid"></div>
     </section>
   </main>
+    </div>
+  </div>
+  <script src="../common.js?v=brand6"></script>
+  <script>
+    document.querySelectorAll('[data-icon]').forEach(el => { el.innerHTML = icon(el.dataset.icon, 18); });
+    document.querySelectorAll('[data-logo]').forEach(el => { el.innerHTML = LOGO_SVG; });
+    document.querySelectorAll('[data-wordmark]').forEach(el => { el.innerHTML = wordmark(); });
+  </script>
   <script type="module" src="app.mjs"></script>
 </body>
 </html>
