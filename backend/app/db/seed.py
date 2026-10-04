@@ -95,7 +95,7 @@ def seed_samples() -> None:
                     update_frequency_minutes=60, **data,
                 ))
             else:
-                report, _ = reports.submit(SubmitReportRequest(
+                report, *_ = reports.submit(SubmitReportRequest(
                     area_id=area_id, kind=data["kind"], message=data["message"],
                     location=GeoPoint(coordinates=data["at"]),
                     reported_at=clock["t"], idempotency_key=f"sample-rep-{i}",

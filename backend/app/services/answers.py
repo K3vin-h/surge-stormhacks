@@ -107,6 +107,7 @@ def agent_turn(
     question: str,
     location: tuple[float, float] | None = None,
     language_hint: str | None = None,
+    device_id: str | None = None,
 ) -> AssistantResponse:
     """Primary chat/voice path.
 
@@ -144,11 +145,12 @@ def agent_turn(
         from ..schemas.reports import SubmitReportRequest
         lat, lng = location
         try:
-            report, _created = reports_svc.submit(SubmitReportRequest(
+            report, *_ = reports_svc.submit(SubmitReportRequest(
                 area_id=area_id,
                 kind=ReportKind(event_type),
                 message=summary or f"{event_type} reported via agent call",
                 location=GeoPoint(coordinates=[lng, lat]),
+                device_id=device_id,
             ))
             report_filed = True
             report_id = report.report_id
