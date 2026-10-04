@@ -40,6 +40,10 @@ routes, roads, hospitals, geometry, signals) lives in `app/fixtures/areas.py`.
 
 ## Provider status flags
 
-On startup the log prints `Gemini enabled: <bool> | ElevenLabs enabled: <bool>`.
-Gemini is considered enabled only when `GEMINI_API_KEY` starts with `AIza`
-(a real AI Studio key). An OAuth-style `AQ.` token is treated as disabled.
+On startup the log prints
+`Gemini enabled: <bool> (auth=<mode>) | ElevenLabs enabled: <bool>`.
+Gemini is enabled whenever `GEMINI_API_KEY` is set. The auth mode is detected
+from the value: a key starting with `AIza` is sent as an AI Studio API key
+(`x-goog-api-key`); anything else is sent as an OAuth access token
+(`Authorization: Bearer`). Any call failure degrades to the deterministic
+keyword fallback, so the app keeps working.

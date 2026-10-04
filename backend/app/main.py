@@ -25,8 +25,9 @@ logging.basicConfig(level=logging.INFO)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     settings = get_settings()
-    log.info("Gemini enabled: %s | ElevenLabs enabled: %s",
-             settings.gemini_enabled, settings.elevenlabs_enabled)
+    log.info("Gemini enabled: %s (auth=%s) | ElevenLabs enabled: %s",
+             settings.gemini_enabled, settings.gemini_auth_mode,
+             settings.elevenlabs_enabled)
     try:
         if sf.ping():
             ensure_schema()

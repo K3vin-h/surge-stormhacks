@@ -52,10 +52,16 @@ class Settings:
 
     @property
     def gemini_enabled(self) -> bool:
-        # A real AI Studio key starts with "AIza". Anything else (e.g. an
-        # OAuth "AQ." token) is treated as unavailable so chat falls back
-        # to the deterministic topic classifier instead of crashing.
-        return bool(self.gemini_api_key and self.gemini_api_key.startswith("AIza"))
+        # Enabled for either credential type; failures degrade to the
+        # deterministic fallback at call time.
+        return bool(self.gemini_api_key)
+
+    @property
+    def gemini_auth_mode(self) -> str:
+        # "api_key"  -> AI Studio key (starts with AIza), sent as x-goog-api-key.
+        # "oauth"    -> OAuth access token (e.g. AQ./ya29.), sent as Bearer.
+        key = self.gemini_api_key or ""
+        return "api_key" if key.startswith("AIza") else "oauth"
 
     @property
     def elevenlabs_enabled(self) -> bool:
