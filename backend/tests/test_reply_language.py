@@ -114,7 +114,7 @@ def test_malformed_optional_model_fields_are_ignored(monkeypatch):
     _, out = _converse(monkeypatch, 'en', json.dumps({
         'reply': 'Hola', 'language': 'es', 'summary': [], 'event_type': {},
     }))
-    assert out == {'reply': 'Hola', 'language': 'es', 'summary': '', 'event_type': 'none'}
+    assert out == {'reply': 'Hola', 'language': 'es', 'summary': '', 'event_type': 'none', 'intent': 'general_safety'}
 
 
 @pytest.mark.parametrize('language', [42, {}, 'not a code', 'es-MX', ' es-MX '])
