@@ -28,6 +28,8 @@ Open http://127.0.0.1:8008/ . The same server serves the home page, `/gov`, `/vi
 
 No `.env`, Snowflake account, Gemini key, or ElevenLabs key is required. Without them the API stores instructions, reports, and events in `backend/local.db` (gitignored, created on first start) and fills an empty database from `backend/app/db/seed.py`. Everyone who clones the repo gets the same demo. Copy `.env.example` to `.env` only when connecting a real Snowflake account or the voice providers.
 
+To check a real Snowflake key-pair connection (manual, not a test): `python backend/scripts/check_snowflake.py`.
+
 The migrated **Rasuwa map and route planner** is also linked from the government page. Its geography and MapLibre files are in the repo. See [its demo and tests](frontend/rasuwa/README.md). The planner alone can be served with `npm run serve` from `frontend/rasuwa`.
 
 ```sh
