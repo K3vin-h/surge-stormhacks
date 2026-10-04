@@ -40,9 +40,12 @@ def get(key: str | None) -> list[tuple[str, str]]:
         if entry is None:
             return []
         msgs, last_used = entry
-        if time.monotonic() - last_used > IDLE_TTL_SECONDS:
+        now = time.monotonic()
+        if now - last_used > IDLE_TTL_SECONDS:
             del _history[key]
             return []
+        _history[key] = (msgs, now)
+        _history.move_to_end(key)
         return list(msgs)[-PROMPT_MESSAGES:]
 
 
@@ -50,14 +53,16 @@ def add_turn(key: str | None, question: str, reply: str) -> None:
     if not key:
         return
     with _lock:
+        now = time.monotonic()
+        entry = _history.get(key)
         msgs = (
-            _history[key][0]
-            if key in _history
+            entry[0]
+            if entry is not None and now - entry[1] <= IDLE_TTL_SECONDS
             else deque(maxlen=MAX_MESSAGES_PER_DEVICE)
         )
         msgs.append(("resident", _clean(question)))
         msgs.append(("assistant", _clean(reply)))
-        _history[key] = (msgs, time.monotonic())
+        _history[key] = (msgs, now)
         _history.move_to_end(key)
         while len(_history) > MAX_DEVICES:
             _history.popitem(last=False)
