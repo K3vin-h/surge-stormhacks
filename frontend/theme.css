@@ -65,7 +65,6 @@ h1, h2, h3, h4 { margin: 0; letter-spacing: -0.02em; font-weight: 600; }
   display: inline-flex; align-items: baseline; font-family: var(--font-brand); font-weight: 600;
   letter-spacing: .3em; line-height: 1; margin-right: -.3em; white-space: nowrap;
 }
-.wm-e { display: block; flex: none; width: calc(66 / 70 * 1cap); height: 1cap; }
 .wm-tag {
   font-family: var(--font-brand); font-weight: 500; font-size: .3em; letter-spacing: .34em;
   text-transform: uppercase; color: var(--brand-sage); white-space: nowrap;

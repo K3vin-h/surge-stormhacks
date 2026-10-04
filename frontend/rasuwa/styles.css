@@ -112,8 +112,32 @@ summary { cursor: pointer; color: var(--ink-2); font-weight: 600; }
 /* Embedded in the government dashboard drawer (?embed=1): the host page supplies navigation and directives. */
 .embed .shell { display: block; background: none; min-height: 0; }
 .embed .sidebar, .embed .topbar, .embed .page-head, .embed .panel.government { display: none; }
-.embed .view { max-width: none; padding: 12px 14px 24px; }
-.embed .notice { margin-bottom: 12px; padding: 8px 12px; font-size: 12px; }
+.embed body, .embed .shell, .embed .main, .embed .view { background: var(--surface); }
+.embed .view { max-width: none; padding: 12px; }
+.embed .notice { margin-bottom: 12px; padding: 8px 12px; font-size: 12px; border-radius: 12px; }
+.embed .notice.simulation { background: var(--sage); border: none; color: var(--sage-ink); }
+.embed .notice.simulation b { color: var(--sage-ink); }
+.embed .planner, .embed .map-workspace, .embed .panel {
+  background: var(--surface-2); border: 1px solid var(--line); border-radius: 16px; box-shadow: none;
+}
+.embed .planner h2, .embed .panel h2 { font-size: 17px; letter-spacing: -.02em; margin: 4px 0 12px; }
+.embed label { font-size: 12px; }
+.embed input[type=number], .embed select, .embed textarea {
+  padding: 10px 12px; font-size: 13px; border-radius: 11px; background-color: #fff;
+}
+.embed input:focus, .embed select:focus, .embed textarea:focus {
+  border-color: var(--brand-sage); box-shadow: 0 0 0 3px rgba(111, 132, 98, .2);
+}
+.embed .modes label {
+  border-radius: 12px; background: #fff; font-weight: 600; font-size: 12.5px; position: relative;
+}
+.embed .modes label input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.embed .modes label:has(input:checked) { background: var(--forest-2); border-color: var(--forest-2); color: #f1f3ea; }
+.embed .candidate { border-radius: 12px; background: #fff; }
+.embed .candidate[aria-pressed=true] { border: 1px solid var(--forest-2); background: var(--sage); color: var(--sage-ink); padding: 13px 14px; }
+.embed #route-status { background: var(--sage); color: var(--sage-ink); border-radius: 12px; }
+.embed button:focus-visible, .embed input:focus-visible, .embed select:focus-visible, .embed a:focus-visible { outline-color: var(--brand-sage); }
+.embed .sensor-card { background: #fff; border-radius: 12px; }
 /* Map stays in view: pinned beside a narrow, independently scrolling form column. */
 .embed .workspace { grid-template-columns: 290px minmax(0, 1fr); gap: 12px; }
 .embed .planner { padding: 16px 16px 18px; max-height: calc(100vh - 82px); overflow: auto; position: sticky; top: 12px; }
