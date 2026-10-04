@@ -23,6 +23,7 @@
         <p>8888 University Drive West, Burnaby, BC</p></div>
       <span class="walking-tag">Walking routes</span>
     </div>
+    <p class="simulation-banner"><strong>Flood simulation.</strong> Fictional sensor readings and flooded sectors for this demo. No live SFU flood observations.</p>
     <div id="load-error" role="alert" hidden></div>
     <div class="campus-layout">
       <aside class="card route-panel" aria-label="Campus route planning">
@@ -33,6 +34,7 @@
         <button id="swap" type="button" aria-label="Swap start and destination" disabled>↕ Swap</button>
         <label for="destination">Destination</label>
         <select id="destination" disabled><option>Loading campus…</option></select>
+        <label class="avoid-floods"><input id="avoid-floods" type="checkbox" checked disabled /> Avoid simulated flooded areas</label>
         <div class="route-result" role="status" aria-live="polite">
           <p id="route-summary">Loading campus paths…</p>
           <strong id="route-distance"></strong>
@@ -43,10 +45,20 @@
       </aside>
       <section class="card map-panel" aria-label="SFU Burnaby campus map">
         <div class="map-heading"><h2>Burnaby campus</h2><span>● Landmarks <i></i> Walking route</span></div>
+        <div class="risk-legend" aria-label="Campus flood legend">
+          <span><i class="risk-low"></i>Low risk</span>
+          <span><i class="risk-elevated"></i>Elevated risk</span>
+          <span><i class="risk-flooded"></i>Simulated flooding</span>
+        </div>
         <div id="map" role="region" aria-label="Interactive campus walking map"></div>
         <p id="map-notice" class="map-notice" role="status" hidden></p>
       </section>
     </div>
+    <section class="sensors-section" aria-label="Simulated campus sensor readings">
+      <div class="sensors-heading"><h2>Campus regions &amp; sensor readings</h2><span>Simulated snapshot</span></div>
+      <p class="sensor-intro">Select a region to inspect it on the map. Water level is compared with a fictional local drainage warning level.</p>
+      <div id="sensor-readings" class="sensor-grid"></div>
+    </section>
   </main>
   <script type="module" src="app.mjs"></script>
 </body>

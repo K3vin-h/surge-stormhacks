@@ -10,6 +10,7 @@ main { max-width: 1440px; margin: 0 auto; padding: 30px 36px; }
 h1 { font-size: clamp(25px, 3vw, 34px); letter-spacing: -.035em; margin: 6px 0 10px; }
 .page-heading p:last-child { color: var(--muted); font-size: 13px; margin: 0; }
 .walking-tag { background: var(--sage); color: var(--sage-ink); border-radius: 20px; padding: 9px 14px; font-size: 12px; white-space: nowrap; }
+.simulation-banner { background: var(--amber-soft); border-left: 3px solid var(--amber); padding: 12px 16px; border-radius: 9px; font-size: 12px; line-height: 1.6; margin: 0 0 20px; }
 .campus-layout { display: grid; grid-template-columns: 300px minmax(0, 1fr); gap: 20px; }
 .route-panel { padding: 24px; }
 h2 { font-size: 17px; margin: 0; }
@@ -20,6 +21,8 @@ button { font: inherit; cursor: pointer; border: 1px solid var(--line-2); border
 button:disabled, select:disabled { opacity: .5; cursor: default; }
 button:focus-visible, select:focus-visible, a:focus-visible { outline: 3px solid var(--amber); outline-offset: 3px; }
 #swap { display: block; margin: 12px 0 -4px auto; }
+.avoid-floods { display: flex; align-items: center; gap: 8px; line-height: 1.5; font-size: 12px; font-weight: 400; cursor: pointer; }
+.avoid-floods input { accent-color: var(--forest-3); flex-shrink: 0; }
 .route-result { background: var(--sage); color: var(--sage-ink); padding: 16px; border-radius: 12px; margin: 24px 0 16px; }
 .route-result p { font-size: 13px; line-height: 1.5; margin: 0; }
 .route-result strong { display: block; font-size: 26px; letter-spacing: -.035em; margin-top: 8px; }
@@ -31,6 +34,12 @@ button:focus-visible, select:focus-visible, a:focus-visible { outline: 3px solid
 .map-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 18px 20px; }
 .map-heading span { font-size: 11px; color: var(--muted); white-space: nowrap; }
 .map-heading i { display: inline-block; width: 16px; height: 3px; background: #327663; margin: 0 4px 3px 12px; }
+.risk-legend { display: flex; gap: 16px; flex-wrap: wrap; padding: 0 20px 14px; font-size: 11px; color: var(--ink-2); }
+.risk-legend span { display: flex; gap: 6px; align-items: center; }
+.risk-legend i { width: 10px; height: 10px; border-radius: 3px; }
+.risk-low { background: #6b9367; }
+.risk-elevated { background: #caa04c; }
+.risk-flooded { background: #c66151; }
 #map { width: 100%; height: min(66vh, 680px); min-height: 470px; background: #e8ede3; }
 .landmark { width: 16px; height: 16px; border: 3px solid #fff; border-radius: 50%; background: #477461; box-shadow: 0 1px 5px #203c3938; padding: 0; }
 .landmark.is-start { background: #bf8736; width: 21px; height: 21px; }
@@ -38,6 +47,17 @@ button:focus-visible, select:focus-visible, a:focus-visible { outline: 3px solid
 .landmark-label { margin: 5px 0 0; display: block; position: absolute; left: 50%; top: 100%; transform: translateX(-50%); background: #ffffffeb; padding: 3px 6px; border-radius: 5px; color: #263c31; font: 10px/1.2 system-ui, sans-serif; white-space: nowrap; pointer-events: none; }
 .map-notice { padding: 10px 16px; margin: 0; font-size: 12px; color: var(--muted); }
 #load-error { background: var(--red-soft); color: var(--red); border-radius: 12px; padding: 16px; margin-bottom: 18px; }
+.sensors-section { margin-top: 28px; }
+.sensors-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.sensors-heading span { color: var(--muted); font-size: 11px; white-space: nowrap; }
+.sensor-intro { font-size: 12px; color: var(--muted); line-height: 1.6; }
+.sensor-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+.sensor-card { border: 1px solid var(--line); border-top: 4px solid; border-radius: 12px; background: var(--surface); padding: 18px; text-align: left; color: var(--ink); }
+.sensor-card strong { font-size: 15px; }
+.sensor-card p { font-size: 12px; line-height: 1.7; margin: 9px 0; }
+.sensor-card small { color: var(--muted); font-size: 10px; }
+.maplibregl-popup-content { font-size: 12px; line-height: 1.6; max-width: 270px; }
+.maplibregl-popup-content p { margin: 8px 0; }
 body.embedded .campus-header { display: none; }
 body.embedded main { padding: 18px; }
 body.embedded .page-heading { margin-bottom: 18px; }
@@ -49,6 +69,8 @@ body.embedded h1 { font-size: 25px; }
   .page-heading { align-items: flex-start; }
   .walking-tag { display: none; }
   .campus-layout { grid-template-columns: minmax(0, 1fr); }
+  .sensor-grid { grid-template-columns: minmax(0, 1fr); }
+  .sensors-heading { align-items: flex-start; flex-direction: column; }
   .route-panel { padding: 20px; }
   .map-heading { flex-wrap: wrap; }
   #map { height: 430px; min-height: 0; }
