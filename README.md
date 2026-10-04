@@ -113,6 +113,7 @@ Open [http://127.0.0.1:8008/](http://127.0.0.1:8008/).
 | Resident app         | [http://127.0.0.1:8008/victim](http://127.0.0.1:8008/victim)     |
 | Rasuwa planner       | [http://127.0.0.1:8008/rasuwa/](http://127.0.0.1:8008/rasuwa/)   |
 | Sunsari planner      | [http://127.0.0.1:8008/sunsari/](http://127.0.0.1:8008/sunsari/) |
+| SFU Burnaby walking map | [http://127.0.0.1:8008/sfu/](http://127.0.0.1:8008/sfu/) |
 | API documentation    | [http://127.0.0.1:8008/docs](http://127.0.0.1:8008/docs)         |
 
 
@@ -142,6 +143,8 @@ npm run serve
 
 Open [Rasuwa](http://127.0.0.1:3010/rasuwa/) or [Sunsari](http://127.0.0.1:3010/sunsari/). Serve the pages over HTTP rather than opening the HTML files directly.
 
+The same server hosts the [SFU Burnaby walking map](http://127.0.0.1:3010/sfu/), a basic campus planner with eight landmarks, start/destination selection, and mapped walking distances. Open it from the government route planner's **SFU Burnaby** button or either regional planner's sidebar. See the [campus map documentation](frontend/sfu/README.md) for data and routing details.
+
 ## Project structure
 
 ```text
@@ -155,6 +158,7 @@ frontend/
   victim.html          Resident app
   rasuwa/              Shared map and routing modules, regional data, and tests
   sunsari/             Sunsari map page and regional data
+  sfu/                 SFU Burnaby campus walking map and bundled path data
 .env.example           Optional integration settings
 render.yaml            Deployment configuration
 ```

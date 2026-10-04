@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>SURGE — SFU campus walking map</title>
+  <link rel="stylesheet" href="../theme.css?v=brand6" />
+  <link rel="stylesheet" href="../rasuwa/vendor/maplibre-gl.css" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="campus-header">
+    <a class="brand" href="../">SURGE <span>/ campus maps</span></a>
+    <nav aria-label="Planner navigation">
+      <a href="../gov.html#planner">Government dashboard</a>
+      <a href="../sunsari/">Sunsari</a>
+      <a href="../rasuwa/">Rasuwa</a>
+    </nav>
+  </header>
+  <main>
+    <div class="page-heading">
+      <div><p class="eyebrow">Simon Fraser University · Burnaby</p><h1>A simple way across campus.</h1>
+        <p>8888 University Drive West, Burnaby, BC</p></div>
+      <span class="walking-tag">Walking routes</span>
+    </div>
+    <div id="load-error" role="alert" hidden></div>
+    <div class="campus-layout">
+      <aside class="card route-panel" aria-label="Campus route planning">
+        <h2>Where are you headed?</h2>
+        <p class="intro">Pick two campus landmarks to find a mapped walking route.</p>
+        <label for="start">Start</label>
+        <select id="start" disabled><option>Loading campus…</option></select>
+        <button id="swap" type="button" aria-label="Swap start and destination" disabled>↕ Swap</button>
+        <label for="destination">Destination</label>
+        <select id="destination" disabled><option>Loading campus…</option></select>
+        <div class="route-result" role="status" aria-live="polite">
+          <p id="route-summary">Loading campus paths…</p>
+          <strong id="route-distance"></strong>
+        </div>
+        <button id="overview" class="overview" type="button" disabled>Campus overview</button>
+        <p class="map-note">Routes end at nearby mapped paths. Check campus signs for entrances and temporary closures. Paths may include stairs; indoor floors and step-free access are not covered.</p>
+        <a class="official-map" href="https://www.sfu.ca/campuses/maps-and-directions/burnaby-map/" target="_blank" rel="noopener noreferrer">Official SFU campus map ↗</a>
+      </aside>
+      <section class="card map-panel" aria-label="SFU Burnaby campus map">
+        <div class="map-heading"><h2>Burnaby campus</h2><span>● Landmarks <i></i> Walking route</span></div>
+        <div id="map" role="region" aria-label="Interactive campus walking map"></div>
+        <p id="map-notice" class="map-notice" role="status" hidden></p>
+      </section>
+    </div>
+  </main>
+  <script type="module" src="app.mjs"></script>
+</body>
+</html>

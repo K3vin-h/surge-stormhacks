@@ -460,6 +460,7 @@
       <div class="acts">
         <a class="hbtn" href="sunsari/">Sunsari</a>
         <a class="hbtn" href="rasuwa/">Rasuwa</a>
+        <button class="hbtn" type="button" id="plannerSFU">SFU Burnaby</button>
         <button class="hbtn icon-only" type="button" id="plannerClose" aria-label="Close route planner" title="Close (Esc)"><span data-icon="x"></span></button>
       </div>
     </header>
@@ -616,11 +617,12 @@
     }
 
     // The planner is its own MapLibre app; it loads on first open and keeps its state while hidden.
-    function setPlanner(open) {
+    function setPlanner(open, requestedRegion) {
       const sheet = $("planner");
       if (open) {
-        const region = state.current === "sunsari" ? "sunsari" : "rasuwa";
         let frame = sheet.querySelector("iframe");
+        const region = requestedRegion || frame?.dataset.region || (state.current === "sunsari" ? "sunsari" : "rasuwa");
+        const name = region === 'sfu' ? 'SFU Burnaby' : region === 'sunsari' ? 'Sunsari' : 'Rasuwa';
         if (!frame) {
           frame = document.createElement("iframe");
           sheet.appendChild(frame);
@@ -628,9 +630,11 @@
         if (frame.dataset.region !== region) {
           frame.dataset.region = region;
           frame.src = `${region}/?embed=1`;
-          frame.title = `${region === 'sunsari' ? 'Sunsari' : 'Rasuwa'} route planner`;
+          frame.title = `${name} route planner`;
         }
-        $("plannerRegion").textContent = `${region === 'sunsari' ? 'Sunsari' : 'Rasuwa / Gosaikunda'} · sensor risk, mapped roads, walking and vehicle routes`;
+        $("plannerRegion").textContent = region === 'sfu'
+          ? 'SFU Burnaby · campus walking routes'
+          : `${region === 'sunsari' ? 'Sunsari' : 'Rasuwa / Gosaikunda'} · sensor risk, mapped roads, walking and vehicle routes`;
       }
       sheet.classList.toggle("open", open);
       sheet.inert = !open;
@@ -642,6 +646,7 @@
       b.onclick = () => setPlanner(!$("planner").classList.contains("open"));
     });
     $("plannerClose").onclick = () => setPlanner(false);
+    $("plannerSFU").onclick = () => setPlanner(true, 'sfu');
     document.addEventListener("keydown", (e) => {
       if (e.key === "Escape" && $("planner").classList.contains("open")) setPlanner(false);
     });
