@@ -34,9 +34,12 @@ async def lifespan(app: FastAPI):
             ensure_schema()
             seed_samples()
             instructions.hydrate_cache()
-            log.info("Snowflake ready; schema ensured; cache hydrated.")
+            if sf.snowflake_configured():
+                log.info("Snowflake ready; schema ensured; cache hydrated.")
+            else:
+                log.info("Using the repo SQLite file at %s; schema ensured; cache hydrated.", sf.LOCAL_DB_PATH)
         else:
-            log.warning("Snowflake ping failed at startup; routes needing it will 503.")
+            log.warning("Database ping failed at startup; routes needing it will 503.")
     except Exception:  # pragma: no cover - startup resilience
         log.exception("Startup DB init failed; continuing in degraded mode.")
     yield

@@ -211,6 +211,7 @@ const ICON_PATHS = {
   upload: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m17 8-5-5-5 5"/><path d="M12 3v12"/>',
   arrowRight: '<path d="M5 12h14"/><path d="m12 5 7 7-7 7"/>',
   chevronRight: '<path d="m9 18 6-6-6-6"/>',
+  chevronLeft: '<path d="m15 18-6-6 6-6"/>',
   chevronDown: '<path d="m6 9 6 6 6-6"/>',
   users: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
   road: '<path d="M4 21 8 3"/><path d="M20 21 16 3"/><path d="M12 5v2"/><path d="M12 11v2"/><path d="M12 17v2"/>',
@@ -250,7 +251,7 @@ const LOGO_SVG = `<img class="emblem" src="${BRAND_BASE}emblem.png" alt="" aria-
 
 // The brand's final E is three bars; the lower two are sage and the last one tapers to a point.
 function wordmark({ tagline = false } = {}) {
-  const e = `<svg class="wm-e" viewBox="0 0 66 70" width="0.66em" height="0.7em" aria-hidden="true">
+  const e = `<svg class="wm-e" viewBox="0 0 66 70" aria-hidden="true">
     <rect width="66" height="12.5" fill="currentColor"/>
     <rect y="28.75" width="53" height="12.5" fill="#6f8462"/>
     <path d="M0 57.5h54l12 6.25-12 6.25H0z" fill="#6f8462"/></svg>`;

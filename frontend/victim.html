@@ -7,7 +7,7 @@
   <title>SURGE — Resident</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <link rel="stylesheet" href="theme.css?v=brand3" />
+  <link rel="stylesheet" href="theme.css?v=brand5" />
   <style>
     html, body { height: 100%; }
     body { background: #0a110d; overflow: hidden; overscroll-behavior: none; -webkit-tap-highlight-color: transparent; }
@@ -19,12 +19,12 @@
 
     .app-head {
       flex: none; display: flex; align-items: center; justify-content: space-between;
-      padding: calc(12px + env(safe-area-inset-top)) 18px 14px; color: #e3e6da;
-      background: linear-gradient(90deg, rgba(13, 21, 17, .96) 30%, rgba(13, 21, 17, .7)), url("assets/brand/hero-dark.jpg") 100% 0% / 200% auto no-repeat, #0d1511;
+      padding: calc(10px + env(safe-area-inset-top)) 16px 12px; color: #e3e6da;
+      background: #0d1511; border-bottom: 1px solid rgba(255, 255, 255, .06);
     }
-    .app-head .brand { display: flex; align-items: center; gap: 10px; }
+    .app-head .brand { display: flex; align-items: center; gap: 10px; padding: 0; }
     .app-head .brand .emblem { width: 32px; height: 32px; }
-    .app-head .name { font-size: 18px; color: #f2f1e8; display: flex; }
+    .app-head .name { font-size: 18px; color: #f2f1e8; display: flex; align-items: center; }
     .bell {
       position: relative; width: 42px; height: 42px; border-radius: 50%; display: grid; place-items: center;
       background: rgba(255, 255, 255, .08); border: 1px solid rgba(255, 255, 255, .12); color: #e3e6da;
@@ -41,41 +41,64 @@
       background: var(--surface); border-top: 1px solid var(--line);
     }
     .tabbar button {
-      position: relative; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 10px 4px;
-      border: 2px solid transparent; border-radius: 16px; background: none; color: var(--muted); font-size: 12px; font-weight: 500;
+      position: relative; display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 8px 4px 6px;
+      border: none; border-radius: 12px; background: none; color: var(--muted); font-size: 11px; font-weight: 500;
     }
-    .tabbar button.active { background: var(--sage); color: var(--ink); font-weight: 700; }
-    .tabbar button:focus-visible { border-color: var(--amber-2); outline: none; }
+    .tabbar button.active { color: var(--ink); font-weight: 650; }
+    .tabbar button.active::before {
+      content: ""; position: absolute; top: 0; width: 18px; height: 3px; border-radius: 2px; background: var(--brand-sage);
+    }
+    .tabbar button:focus-visible { outline: 2px solid var(--brand-sage); outline-offset: -2px; }
     .tabbar .ndot { top: 6px; right: calc(50% - 16px); background: var(--red); box-shadow: 0 0 0 2px var(--surface); }
 
     /* Home */
-    .greet { color: var(--ink-2); margin-top: 20px; font-size: 15px; }
-    .home h1 { font-size: 31px; line-height: 1.08; margin: 4px 0 18px; letter-spacing: -0.03em; }
-    .area-card {
-      position: relative; background: var(--surface); border: 1px solid var(--line-2); border-radius: 16px; padding: 12px 18px;
-      box-shadow: var(--shadow);
+    .home-bar { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+    .home-bar .pill { flex: none; margin-top: 2px; }
+    .greet { color: var(--muted); margin: 0; font-size: 12.5px; }
+    .area-card { position: relative; z-index: 5; min-width: 0; padding: 0; }
+    .area-card .val { position: relative; min-width: 0; }
+    .area-open {
+      display: inline-flex; align-items: baseline; gap: 8px; max-width: 100%; min-width: 0;
+      margin: 0; padding: 0; border: none; background: none; cursor: pointer; color: inherit;
+      font: inherit; font-size: 22px; font-weight: 650; letter-spacing: -.02em; line-height: 1.15; text-align: left;
     }
-    .area-card .eyebrow { font-size: 10px; color: var(--muted); }
-    .area-card .val { display: flex; justify-content: space-between; align-items: center; font-size: 18px; font-weight: 600; margin-top: 2px; }
-    .area-card select { position: absolute; inset: 0; opacity: 0; width: 100%; cursor: pointer; font-size: 16px; }
-    .area-card .change { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; font-weight: 600; color: var(--forest-3); }
-    .area-hint { font-size: 12px; color: var(--muted); margin-top: 2px; }
-    .area-card.needs-pick { border: 2px solid var(--amber-2); padding: 11px 17px; background: var(--amber-soft); }
+    .area-open:focus-visible { outline: 2px solid var(--brand-sage); outline-offset: 4px; border-radius: 8px; }
+    #areaName { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .area-card .change { display: inline-flex; align-items: center; gap: 2px; flex: none; font-size: 13px; font-weight: 600; color: var(--forest-3); }
+    .area-card.open .change { color: var(--ink); }
+    .area-card .change svg { transition: transform .15s; }
+    .area-card.open .change svg { transform: rotate(180deg); }
+    .area-menu {
+      position: absolute; z-index: 6; top: calc(100% + 8px); left: 0; min-width: 228px; margin: 0; padding: 6px;
+      background: var(--surface); border: 1px solid var(--line); border-radius: 16px; box-shadow: var(--shadow-lg);
+    }
+    .area-menu[hidden] { display: none; }
+    .area-menu button {
+      display: flex; align-items: center; justify-content: space-between; gap: 16px; width: 100%;
+      border: none; background: transparent; color: var(--ink); border-radius: 11px;
+      padding: 10px 12px; font: inherit; font-size: 14.5px; font-weight: 600; text-align: left; cursor: pointer;
+    }
+    .area-menu button .tick { display: none; color: var(--sage-ink); }
+    .area-menu button[aria-selected="true"] { background: var(--sage); }
+    .area-menu button[aria-selected="true"] .tick { display: inline-flex; }
+    .area-menu button:hover, .area-menu button:focus-visible { background: var(--surface-3); outline: none; }
+    .area-menu button[aria-selected="true"]:hover, .area-menu button[aria-selected="true"]:focus-visible { background: var(--sage); }
+    .area-hint { font-size: 12px; color: var(--muted); margin-top: 3px; }
+    .area-card.needs-pick { background: var(--amber-soft); border: 1px solid var(--amber-2); border-radius: 14px; padding: 8px 12px; }
     .area-card.needs-pick .area-hint { color: var(--amber); font-weight: 600; }
     .inst {
-      position: relative; overflow: hidden; margin-top: 16px; border-radius: 22px; padding: 22px 22px 18px 24px;
+      position: relative; overflow: hidden; border-radius: 22px; padding: 18px 18px 14px 20px;
       color: #f2f1e8; box-shadow: var(--shadow-lg);
-      background: linear-gradient(165deg, rgba(17, 28, 22, .9), rgba(13, 21, 17, .76)), url("assets/brand/hero-dark.jpg") 0% 100% / 420% auto no-repeat, #0d1511;
+      background: linear-gradient(165deg, rgba(31, 49, 37, .88), rgba(20, 32, 25, .72)), url("assets/brand/hero-dark.jpg") 0% 100% / 420% auto no-repeat, #1f3125;
     }
     .inst::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 5px; background: var(--amber-2); }
-    .inst.clear { background: linear-gradient(165deg, rgba(31, 49, 37, .88), rgba(20, 32, 25, .72)), url("assets/brand/hero-dark.jpg") 0% 100% / 420% auto no-repeat, #1f3125; }
     .inst.clear::before { background: var(--brand-sage-2); }
     .inst.none { background: var(--surface); color: var(--ink); border: 1px solid var(--line); box-shadow: var(--shadow); }
     .inst.none::before { background: var(--line-2); }
     .inst-top { display: flex; justify-content: space-between; align-items: center; font-size: 11.5px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }
     .inst-top span:first-child { display: flex; align-items: center; gap: 8px; opacity: .9; }
     .inst-cur { font-size: 10.5px; letter-spacing: .04em; padding: 5px 10px; border-radius: 999px; background: rgba(255, 255, 255, .14); }
-    .inst h2 { font-size: 34px; margin: 18px 0 8px; letter-spacing: -0.02em; }
+    .inst h2 { font-size: 32px; margin: 14px 0 6px; letter-spacing: -0.03em; }
     .inst p { margin: 0; font-size: 15px; line-height: 1.5; opacity: .92; }
     .inst-go { margin-top: 14px; display: grid; gap: 8px; }
     .inst-go div { display: flex; gap: 10px; align-items: center; padding: 10px 12px; border-radius: 12px; background: rgba(255, 255, 255, .08); font-size: 13px; }
@@ -87,15 +110,13 @@
       background: rgba(255, 255, 255, .12); border: 1px solid rgba(255, 255, 255, .22); color: inherit;
     }
     .inst.none .listen, .alert-card .listen { background: var(--surface-2); border-color: var(--line-2); color: var(--forest-2); }
-    .meta-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
-    .meta { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; }
-    .meta .eyebrow { font-size: 9.5px; color: var(--muted); margin-bottom: 6px; }
-    .meta b { font-size: 15px; }
-    .sec-title { display: flex; justify-content: space-between; align-items: baseline; margin: 26px 0 10px; }
+    .status-line { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 12px; font-size: 12.5px; color: var(--ink-2); }
+    .status-line b { color: var(--ink); font-weight: 650; }
+    .sec-title { display: flex; justify-content: space-between; align-items: baseline; margin: 18px 0 8px; }
     .sec-title h3 { font-size: 17px; }
     .acts { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
     .act {
-      display: flex; align-items: center; gap: 12px; padding: 14px; border-radius: 16px; border: 1px solid var(--line);
+      display: flex; align-items: center; gap: 12px; padding: 12px; border-radius: 16px; border: 1px solid var(--line);
       background: var(--surface); text-align: left; font-weight: 600; font-size: 13.5px; box-shadow: var(--shadow);
     }
     .act .ai { width: 38px; height: 38px; border-radius: 12px; display: grid; place-items: center; flex: none; }
@@ -117,13 +138,14 @@
     #tab-map { padding: 0; overflow: hidden; }
     #map { position: absolute; inset: 0; z-index: 0; }
     .attrib { font-size: 10.5px; color: var(--muted); text-align: center; padding-top: 10px; }
-    #tab-map .map-legend { left: 12px; top: 12px; }
+    #tab-map .map-legend { left: 12px; right: 64px; top: 12px; width: auto; flex-wrap: wrap; }
     .locate { position: absolute; right: 12px; top: 12px; z-index: 500; width: 40px; height: 40px; border-radius: 12px; border: none; background: var(--surface); box-shadow: var(--shadow); display: grid; place-items: center; color: var(--ink); }
     .sheet {
       position: absolute; left: 0; right: 0; bottom: 0; z-index: 600; background: var(--surface); border-radius: 26px 26px 0 0;
       box-shadow: 0 -12px 30px -12px rgba(0, 0, 0, .25); padding: 10px 20px 16px; max-height: 52%; overflow-y: auto; transition: max-height .25s;
     }
-    .sheet.collapsed { max-height: 118px; overflow: hidden; }
+    .sheet.collapsed { max-height: none; overflow: hidden; }
+    .sheet.collapsed .sh-item, .sheet.collapsed .attrib { display: none; }
     .grab { width: 44px; height: 5px; border-radius: 3px; background: var(--line-2); margin: 0 auto 14px; border: none; display: block; padding: 0; }
     .sh-route { display: flex; gap: 14px; align-items: center; padding-bottom: 14px; border-bottom: 1px solid var(--line); }
     .sh-ic { width: 52px; height: 52px; border-radius: 14px; display: grid; place-items: center; flex: none; }
@@ -157,8 +179,8 @@
     /* Assistant tab */
     #tab-assistant { display: flex; flex-direction: column; padding: 0; overflow: hidden; }
     #tab-assistant[hidden] { display: none; }
-    .as-head { padding: 16px 20px 10px; display: flex; justify-content: space-between; align-items: center; gap: 10px; }
-    .as-head h2 { font-size: 22px; }
+    .as-head { padding: 14px 18px 4px; display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+    .as-head h2 { font-size: 20px; margin-top: 2px; }
     .chat { flex: 1; overflow-y: auto; padding: 4px 20px 12px; display: flex; flex-direction: column; gap: 10px; }
     .bubble { max-width: 86%; padding: 11px 14px; border-radius: 18px; font-size: 14px; line-height: 1.5; white-space: pre-wrap; word-break: break-word; }
     .bubble .who { font-size: 10.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; opacity: .65; margin-bottom: 4px; display: flex; justify-content: space-between; gap: 10px; align-items: center; }
@@ -171,7 +193,7 @@
     .typing i { width: 6px; height: 6px; border-radius: 50%; background: var(--muted); animation: blink 1.2s infinite; }
     .typing i:nth-child(2) { animation-delay: .2s; } .typing i:nth-child(3) { animation-delay: .4s; }
     @keyframes blink { 0%, 80%, 100% { opacity: .25; } 40% { opacity: 1; } }
-    .suggest { display: flex; gap: 8px; overflow-x: auto; padding: 0 20px 10px; scrollbar-width: none; }
+    .suggest { display: flex; flex-wrap: wrap; gap: 8px; padding: 8px 18px 2px; }
     .suggest button { flex: none; display: inline-flex; align-items: center; gap: 7px; border: 1px solid var(--line-2); background: var(--surface); border-radius: 999px; padding: 9px 14px; font-size: 13px; font-weight: 600; color: var(--forest-2); }
     .composer { display: flex; gap: 8px; align-items: center; padding: 10px 14px 12px; border-top: 1px solid var(--line); background: var(--surface-2); }
     .composer input { flex: 1; min-width: 0; padding: 12px 14px; border-radius: 14px; border: 1px solid var(--line-2); background: var(--surface); outline: none; font-size: 16px; }
@@ -193,23 +215,23 @@
       <main class="screen">
         <!-- HOME -->
         <section class="tab home" id="tab-home">
-          <span class="pill tone-amber"><i class="dot"></i>Demo information · not live</span>
-          <div class="greet" id="greet">Hello</div>
-          <h1>What’s happening near you</h1>
-
-          <div class="area-card" id="areaCard">
-            <div class="eyebrow">Your area</div>
-            <div class="val"><span id="areaName">—</span><span class="change">Change<span data-icon="chevronDown"></span></span></div>
-            <div class="area-hint" id="areaHint"></div>
-            <select id="areaSelect" aria-label="Your area"></select>
+          <div class="home-bar">
+            <div class="area-card" id="areaCard">
+              <div class="greet" id="greet">Hello</div>
+              <div class="val">
+                <button type="button" class="area-open" id="areaBtn" aria-haspopup="listbox" aria-expanded="false" aria-controls="areaMenu">
+                  <span id="areaName">—</span><span class="change">Change<span data-icon="chevronDown"></span></span>
+                </button>
+                <div class="area-menu" id="areaMenu" role="listbox" aria-label="Your area" hidden></div>
+              </div>
+              <div class="area-hint" id="areaHint"></div>
+            </div>
+            <span class="pill tone-amber"><i class="dot"></i>Demo</span>
           </div>
 
           <div id="instCard" class="inst none"><p>Loading official instruction…</p></div>
 
-          <div class="meta-row">
-            <div class="meta"><div class="eyebrow">Area risk</div><div id="riskMeta">—</div></div>
-            <div class="meta"><div class="eyebrow">Next official update</div><b id="nextMeta">—</b></div>
-          </div>
+          <div class="status-line"><span id="riskMeta">—</span><span>Next update <b id="nextMeta">—</b></span></div>
 
           <div class="sec-title"><h3>Report to authorities</h3><span class="small muted">Shares your location</span></div>
           <div class="acts" id="acts">
@@ -227,7 +249,7 @@
           <div id="map"></div>
           <div id="legendSlot"></div>
           <button class="locate" id="locateBtn" aria-label="Show my location"><span data-icon="locate"></span></button>
-          <div class="sheet" id="sheet">
+          <div class="sheet collapsed" id="sheet">
             <button class="grab" id="grab" aria-label="Expand details"></button>
             <div id="sheetBody"></div>
             <div class="attrib">Map data © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap contributors</a></div>
@@ -252,11 +274,13 @@
             <div><div class="eyebrow">Relief assistant</div><h2>How can we help?</h2></div>
             <span class="pill tone-neutral" id="langBadge"><span data-icon="globe"></span>Auto</span>
           </div>
-          <div class="chat" id="chat"></div>
-          <div id="agentStatus" class="muted"></div>
           <div class="suggest" id="suggest">
             <button data-q="Summarize the situation and my next actions." data-who="You (briefing)"><span data-icon="volume"></span>Hear briefing</button>
+            <button data-q="Where should I go, and which route is approved?">Where do I go?</button>
+            <button data-q="Which roads should I avoid right now?">Roads to avoid</button>
           </div>
+          <div class="chat" id="chat"></div>
+          <div id="agentStatus" class="muted"></div>
           <div class="composer">
             <button class="round mic" id="callBtn" aria-label="Tap to talk"><span data-icon="mic"></span></button>
             <input id="q" type="text" placeholder="Ask in any language…" autocomplete="off" />
@@ -273,7 +297,7 @@
       </nav>
   </div>
 
-  <script src="common.js?v=brand3"></script>
+  <script src="common.js?v=brand5"></script>
   <script>
     const $ = (id) => document.getElementById(id);
     let current = "sunsari";
@@ -312,11 +336,33 @@
     function setUnseen(on) { $("bellDot").hidden = !on; $("tabDot").hidden = !on; }
 
     // ---- Area ----
-    const sel = $("areaSelect");
-    sel.innerHTML = AREAS.map((a) => `<option value="${a}">${esc(AREA_LABELS[a])}</option>`).join("");
-    sel.value = current;
+    const areaBtn = $("areaBtn");
+    const areaMenu = $("areaMenu");
     $("areaName").textContent = AREA_LABELS[current];
+    areaMenu.innerHTML = AREAS.map((a) =>
+      `<button type="button" role="option" data-area="${a}">${esc(AREA_LABELS[a])}<span class="tick">${icon("check", 16)}</span></button>`
+    ).join("");
     let areaManual = false;
+
+    function syncAreaMenu() {
+      areaMenu.querySelectorAll("[data-area]").forEach((item) => {
+        item.setAttribute("aria-selected", item.dataset.area === current ? "true" : "false");
+      });
+    }
+    function closeAreaMenu() {
+      areaMenu.hidden = true;
+      areaBtn.setAttribute("aria-expanded", "false");
+      $("areaCard").classList.remove("open");
+    }
+    function openAreaMenu() {
+      syncAreaMenu();
+      areaMenu.hidden = false;
+      areaBtn.setAttribute("aria-expanded", "true");
+      $("areaCard").classList.add("open");
+      const selected = areaMenu.querySelector('[aria-selected="true"]');
+      if (selected) selected.focus();
+    }
+    syncAreaMenu();
 
     function setAreaHint(reason) {
       $("areaHint").textContent = AREA_HINTS[reason];
@@ -326,7 +372,7 @@
     function setArea(areaId) {
       if (areaId === current) return;
       current = areaId;
-      sel.value = areaId;
+      syncAreaMenu();
       $("areaName").textContent = AREA_LABELS[current];
       lastSeenInstructionId = undefined; // rebaseline for the new area
       mapSig = "";
@@ -336,11 +382,43 @@
       if (tab === "alerts") loadAlerts();
     }
 
-    sel.onchange = () => {
-      areaManual = true;
-      setAreaHint("manual");
-      setArea(sel.value);
+    areaBtn.onclick = () => (areaMenu.hidden ? openAreaMenu() : closeAreaMenu());
+    areaBtn.onkeydown = (e) => {
+      if ((e.key === "ArrowDown" || e.key === "ArrowUp") && areaMenu.hidden) {
+        e.preventDefault();
+        openAreaMenu();
+      }
     };
+    areaMenu.onclick = (e) => {
+      const item = e.target.closest("[data-area]");
+      if (!item) return;
+      if (item.dataset.area !== current) {
+        areaManual = true;
+        setAreaHint("manual");
+        setArea(item.dataset.area);
+      }
+      closeAreaMenu();
+      areaBtn.focus();
+    };
+    areaMenu.onkeydown = (e) => {
+      const items = [...areaMenu.querySelectorAll("[data-area]")];
+      const index = items.indexOf(document.activeElement);
+      if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+        e.preventDefault();
+        const step = e.key === "ArrowDown" ? 1 : -1;
+        items[(index + step + items.length) % items.length].focus();
+      } else if (e.key === "Escape") {
+        e.preventDefault();
+        closeAreaMenu();
+        areaBtn.focus();
+      }
+    };
+    document.addEventListener("click", (e) => {
+      if (!$("areaCard").contains(e.target)) closeAreaMenu();
+    });
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && !areaMenu.hidden) closeAreaMenu();
+    });
 
     // ---- Home: instruction card ----
     function renderHome() {
@@ -348,7 +426,7 @@
       const inst = status.instruction;
       const risk = riskInfo(status.summary.risk_level);
       $("riskMeta").innerHTML = pill(`${risk.label} · ${Math.round(status.summary.risk_score * 100)}/100`, risk.tone);
-      $("nextMeta").textContent = inst && inst.next_update_at ? `By ${fmtClock(inst.next_update_at)}` : "When issued";
+      $("nextMeta").textContent = inst && inst.next_update_at ? fmtClock(inst.next_update_at) : "when issued";
       if (!inst) {
         card.className = "inst none";
         card.innerHTML = `<div class="inst-top"><span>${icon("broadcast", 16)}Official instruction</span></div>

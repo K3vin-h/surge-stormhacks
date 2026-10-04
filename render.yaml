@@ -7,7 +7,7 @@ services:
     buildCommand: pip install -r requirements.txt
     startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
     envVars:
-      # Pin Python to match local (deps tested on 3.11).
+      # Python version the dependencies were tested on.
       - key: PYTHON_VERSION
         value: 3.11.9
       # --- Snowflake (non-secret infra values; auth needs the private key) ---
@@ -23,7 +23,8 @@ services:
         value: PUBLIC
       - key: SNOWFLAKE_ROLE
         value: ACCOUNTADMIN
-      # Private key is uploaded as a Render Secret File (mounted here).
+      # Render mounts the uploaded key here. A local clone leaves this unset
+      # and stores the demo in backend/local.db instead.
       - key: SNOWFLAKE_PRIVATE_KEY_PATH
         value: /etc/secrets/rsa_key.p8
       # --- Secrets: set these in the Render dashboard (never committed) ---

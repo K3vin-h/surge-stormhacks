@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>SURGE — Flood response intelligence</title>
-  <link rel="stylesheet" href="theme.css?v=brand3" />
+  <link rel="stylesheet" href="theme.css?v=brand5" />
   <style>
     body { min-height: 100vh; display: flex; flex-direction: column; }
     .hero { color: #e9ebe2; padding: 0 0 120px; position: relative; overflow: hidden; background: #0c1512; }
@@ -44,21 +44,21 @@
   </section>
 
   <div class="wrap cards">
-    <a class="card entry" href="/gov">
+    <a class="card entry" href="gov.html">
       <span class="ic" data-icon="monitor"></span>
       <div class="eyebrow">For emergency operations</div>
       <h2>Response workspace</h2>
       <p>Risk-ranked areas, decision signals, field reports, the alerts log and instruction publishing.</p>
       <span class="go">Open workspace <span data-icon="arrowRight"></span></span>
     </a>
-    <a class="card entry" href="/victim">
+    <a class="card entry" href="victim.html">
       <span class="ic" data-icon="phone"></span>
       <div class="eyebrow">For residents</div>
       <h2>Resident app</h2>
       <p>Current instruction, evacuation map, alert history, a multilingual voice assistant and SOS reporting.</p>
       <span class="go">Open app <span data-icon="arrowRight"></span></span>
     </a>
-    <a class="card entry" href="/rasuwa/">
+    <a class="card entry" href="rasuwa/">
       <span class="ic" data-icon="route"></span>
       <div class="eyebrow">Planning tool</div>
       <h2>Rasuwa Route Planner</h2>
@@ -69,7 +69,7 @@
 
   <footer>Geographic data © OpenStreetMap contributors. Model outputs are simulated and require human review.</footer>
 
-  <script src="common.js?v=brand3"></script>
+  <script src="common.js?v=brand5"></script>
   <script>
     document.getElementById("logo").innerHTML = LOGO_SVG;
     document.querySelectorAll("[data-icon]").forEach((el) => { el.innerHTML = icon(el.dataset.icon, el.classList.contains("ic") ? 22 : 16); });

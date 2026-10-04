@@ -6,9 +6,11 @@
   <title>SURGE — Government</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <link rel="stylesheet" href="theme.css?v=brand3" />
+  <link rel="stylesheet" href="theme.css?v=brand5" />
   <style>
     :root { --rail-w: 344px; --cmp-w: 404px; --gap: 14px; }
+    body.rail-off { --rail-w: 0px; }
+    body.cmp-off { --cmp-w: 0px; }
     [hidden] { display: none !important; }
     body { height: 100vh; overflow: hidden; background: #dcdad0; }
     ::-webkit-scrollbar { width: 9px; }
@@ -22,7 +24,7 @@
     .lbl { font-size: 10px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
 
     /* ---------- Map canvas ---------- */
-    #map { position: fixed; top: 0; left: 0; bottom: 0; right: var(--cmp-w); z-index: 0; }
+    #map { position: fixed; top: 0; left: 0; bottom: 0; right: var(--cmp-w); z-index: 0; transition: right .22s ease; }
     .leaflet-control-zoom { margin: 0 14px 14px 0 !important; }
     .emoji-pin {
       width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; font-size: 15px; line-height: 1;
@@ -40,10 +42,12 @@
 
     /* ---------- Left rail ---------- */
     .rail {
-      position: fixed; z-index: 900; top: var(--gap); left: var(--gap); bottom: var(--gap); width: var(--rail-w);
+      position: fixed; z-index: 900; top: var(--gap); left: var(--gap); bottom: var(--gap); width: 344px;
       display: flex; flex-direction: column; gap: 10px; pointer-events: none;
+      transition: transform .22s ease;
     }
     .rail > * { pointer-events: auto; }
+    body.rail-off .rail { transform: translateX(calc(-100% - var(--gap))); pointer-events: none; }
     .rail-top { padding: 16px 16px 10px; flex: none; }
     .brand-row { display: flex; align-items: center; gap: 10px; }
     .brand-row .logo { display: flex; }
@@ -119,6 +123,7 @@
       position: fixed; z-index: 800; top: var(--gap); left: calc(var(--rail-w) + var(--gap) * 2);
       right: calc(var(--cmp-w) + var(--gap));
       display: flex; align-items: center; gap: 16px; padding: 10px 16px; font-size: 12.5px; color: var(--ink-2); border-radius: 14px;
+      transition: left .22s ease, right .22s ease;
     }
     #sitline { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 0; min-width: 0; }
     #sitline > span { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
@@ -129,7 +134,7 @@
     .live-state .sys-dot { animation: breathe 2.4s ease-in-out infinite; }
     @keyframes breathe { 50% { opacity: .4; } }
 
-    .legend-wrap { position: fixed; z-index: 800; bottom: var(--gap); left: calc(var(--rail-w) + var(--gap) * 2); display: flex; flex-direction: column-reverse; align-items: flex-start; gap: 8px; }
+    .legend-wrap { position: fixed; z-index: 800; bottom: var(--gap); left: calc(var(--rail-w) + var(--gap) * 2); display: flex; flex-direction: column-reverse; align-items: flex-start; gap: 8px; transition: left .22s ease; }
     .map-btns { display: flex; gap: 8px; }
     .key-btn { border-radius: 10px; padding: 7px 12px; font-size: 12px; font-weight: 600; color: var(--ink-2); display: inline-flex; align-items: center; gap: 7px; }
     .key-btn[aria-expanded="true"] { background: var(--forest-2); color: #f1f3ea; border-color: var(--forest-2); }
@@ -140,9 +145,9 @@
       display: flex; flex-direction: column; overflow: hidden; border-radius: 20px; background: var(--bg);
       box-shadow: 0 30px 80px -24px rgba(13, 21, 17, .55), 0 0 0 1px rgba(17, 28, 22, .08);
       transform: translateY(16px) scale(.985); opacity: 0; visibility: hidden;
-      transition: transform .22s ease, opacity .22s ease, visibility 0s linear .22s;
+      transition: transform .22s ease, opacity .22s ease, visibility 0s linear .22s, right .22s ease;
     }
-    .planner.open { transform: none; opacity: 1; visibility: visible; transition: transform .22s ease, opacity .22s ease; }
+    .planner.open { transform: none; opacity: 1; visibility: visible; transition: transform .22s ease, opacity .22s ease, right .22s ease; }
     .planner-head {
       flex: none; display: flex; align-items: center; gap: 12px; padding: 12px 14px 12px 18px; color: #eef0e7;
       background: linear-gradient(90deg, rgba(13, 21, 17, .95) 35%, rgba(13, 21, 17, .72)), url("assets/brand/hero-dark.jpg") 100% 0% / 160% auto no-repeat, #0d1511;
@@ -197,11 +202,32 @@
 
     /* ---------- Composer (right) ---------- */
     .composer {
-      position: fixed; z-index: 950; top: 0; right: 0; bottom: 0; width: var(--cmp-w);
+      position: fixed; z-index: 950; top: 0; right: 0; bottom: 0;
       background: var(--surface); border-left: 1px solid var(--line); display: flex; flex-direction: column;
-      box-shadow: -12px 0 30px -18px rgba(28, 33, 23, .25);
+      box-shadow: -12px 0 30px -18px rgba(28, 33, 23, .25); width: 404px;
+      transition: transform .22s ease;
     }
     .cmp-scroll { flex: 1; overflow: auto; padding: 16px 18px 6px; }
+    body.cmp-off .composer { transform: translateX(100%); }
+
+    .dock {
+      position: fixed; z-index: 980; top: 50%; width: 18px; height: 28px; margin-top: -14px; padding: 0;
+      border-radius: 999px; border: 1px solid rgba(255, 252, 245, .95); background: rgba(255, 252, 245, .94);
+      color: var(--ink-2); box-shadow: 0 6px 16px -10px rgba(28, 33, 23, .55);
+      display: grid; place-items: center; opacity: 0; transition: opacity .15s ease, left .22s ease, right .22s ease;
+    }
+    .dock-rail { left: calc(var(--gap) + var(--rail-w) - 9px); }
+    .dock-cmp { right: calc(var(--cmp-w) - 9px); }
+    body.rail-off .dock-rail { left: 8px; }
+    body.cmp-off .dock-cmp { right: 8px; }
+    body:has(.rail:hover) .dock-rail,
+    .dock-rail:hover, .dock-rail:focus-visible,
+    body:has(.composer:hover) .dock-cmp,
+    .dock-cmp:hover, .dock-cmp:focus-visible { opacity: 1; }
+    body.rail-off .dock-rail::before, body.cmp-off .dock-cmp::before {
+      content: ""; position: absolute; top: -90px; bottom: -90px; left: -10px; right: -6px;
+    }
+    .dock:focus-visible { outline: 2px solid var(--brand-sage); outline-offset: 2px; }
 
     .live {
       border-radius: 16px; padding: 16px 18px 14px; color: #eef0e7; position: relative; overflow: hidden;
@@ -276,16 +302,21 @@
       .planner { position: fixed; inset: 0; border-radius: 0; z-index: 2000; }
       .planner-head p { display: none; }
       .planner-head .hbtn .lbl-full { display: none; }
+      .dock { display: none; }
+      body.rail-off .rail, body.cmp-off .composer { transform: none; pointer-events: auto; }
+      body.rail-off .rail > * { pointer-events: auto; }
     }
   </style>
 </head>
 <body>
   <div id="map"></div>
+  <button class="dock dock-rail" id="dockRail" type="button" aria-pressed="false" aria-label="Hide side panel" title="Hide side panel"></button>
+  <button class="dock dock-cmp" id="dockCmp" type="button" aria-pressed="false" aria-label="Hide directive panel" title="Hide directive panel"></button>
 
   <div class="rail">
     <section class="glass rail-top">
       <div class="brand-row">
-        <a class="logo" href="/" aria-label="SURGE home" id="logo"></a>
+        <a class="logo" href="index.html" aria-label="SURGE home" id="logo"></a>
         <span class="word" id="wordmark"></span><span class="gov">Gov</span>
         <span class="tools">
           <a class="tool" href="victim.html" target="_blank" rel="noopener" title="Open resident app" aria-label="Open resident app"><span data-icon="phone"></span></a>
@@ -387,7 +418,7 @@
     </header>
   </section>
 
-  <script src="common.js?v=brand3"></script>
+  <script src="common.js?v=brand5"></script>
   <script>
     const $ = (id) => document.getElementById(id);
     const state = {
@@ -400,6 +431,24 @@
     document.querySelectorAll("[data-icon]").forEach((el) => { el.innerHTML = icon(el.dataset.icon, 16); });
     $("logo").innerHTML = LOGO_SVG;
     $("wordmark").innerHTML = wordmark();
+
+    function setPanel(name, off) {
+      const rail = name === "rail";
+      document.body.classList.toggle(rail ? "rail-off" : "cmp-off", off);
+      const btn = $(rail ? "dockRail" : "dockCmp");
+      const label = rail ? (off ? "Show side panel" : "Hide side panel") : (off ? "Show directive panel" : "Hide directive panel");
+      btn.setAttribute("aria-pressed", String(off));
+      btn.setAttribute("aria-label", label);
+      btn.title = label;
+      const glyph = rail ? (off ? "chevronRight" : "chevronLeft") : (off ? "chevronLeft" : "chevronRight");
+      btn.innerHTML = icon(glyph, 12);
+      try { localStorage.setItem(rail ? "surge.gov.railOff" : "surge.gov.cmpOff", off ? "1" : "0"); } catch (_) {}
+      if (map) setTimeout(() => map.invalidateSize(), 240);
+    }
+    setPanel("rail", localStorage.getItem("surge.gov.railOff") === "1");
+    setPanel("cmp", localStorage.getItem("surge.gov.cmpOff") === "1");
+    $("dockRail").onclick = () => setPanel("rail", !document.body.classList.contains("rail-off"));
+    $("dockCmp").onclick = () => setPanel("cmp", !document.body.classList.contains("cmp-off"));
     $("keyBtn").onclick = () => {
       const open = $("legend").hidden;
       $("legend").hidden = !open;

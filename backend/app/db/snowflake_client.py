@@ -4,28 +4,36 @@ A single lazily-created connection is reused across requests and
 re-established if it drops. JSON columns are stored as TEXT and
 (de)serialized in Python to avoid PARSE_JSON binding friction.
 
-When Snowflake is not configured (no account or private key), the same
-interface is served by a local SQLite file so the app runs for local dev.
+When Snowflake is not configured (no account, user, or key file), the same
+interface is served by a SQLite file created inside this clone. The file is
+gitignored. Set SURGE_LOCAL_DB to move it; a relative value is resolved from
+the repo root, not from the current working directory.
 """
 from __future__ import annotations
 
 import logging
+import os
 import sqlite3
 import threading
 from datetime import datetime
+from pathlib import Path
 from typing import Any, Sequence
-
-import snowflake.connector
-from cryptography.hazmat.primitives import serialization
 
 from ..config import REPO_ROOT, get_settings
 
 log = logging.getLogger("surge.db")
 
 _lock = threading.Lock()
-_conn: snowflake.connector.SnowflakeConnection | None = None
+_conn: Any = None
 
-LOCAL_DB_PATH = REPO_ROOT / "backend" / "local.db"
+
+def _sqlite_path() -> Path:
+    raw = (os.getenv("SURGE_LOCAL_DB") or "").strip()
+    path = Path(raw) if raw else Path("backend") / "local.db"
+    return path if path.is_absolute() else REPO_ROOT / path
+
+
+LOCAL_DB_PATH = _sqlite_path()
 _local: sqlite3.Connection | None = None
 sqlite3.register_adapter(datetime, lambda d: d.isoformat())
 
@@ -39,7 +47,8 @@ def snowflake_configured() -> bool:
 def _local_conn() -> sqlite3.Connection:
     global _local
     if _local is None:
-        log.warning("Snowflake not configured; using local SQLite store at %s", LOCAL_DB_PATH)
+        LOCAL_DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+        log.warning("Snowflake not configured; using SQLite at %s", LOCAL_DB_PATH)
         _local = sqlite3.connect(LOCAL_DB_PATH, check_same_thread=False)
         _local.row_factory = sqlite3.Row
     return _local
@@ -50,6 +59,8 @@ def _local_sql(sql: str) -> str:
 
 
 def _load_private_key_der() -> bytes:
+    from cryptography.hazmat.primitives import serialization
+
     settings = get_settings()
     path = settings.sf_private_key_abs
     if path is None or not path.exists():
@@ -63,7 +74,9 @@ def _load_private_key_der() -> bytes:
     )
 
 
-def _connect() -> snowflake.connector.SnowflakeConnection:
+def _connect() -> Any:
+    import snowflake.connector
+
     s = get_settings()
     return snowflake.connector.connect(
         account=s.sf_account,
@@ -77,7 +90,7 @@ def _connect() -> snowflake.connector.SnowflakeConnection:
     )
 
 
-def get_connection() -> snowflake.connector.SnowflakeConnection:
+def get_connection() -> Any:
     global _conn
     with _lock:
         if _conn is None or _conn.is_closed():
@@ -108,6 +121,8 @@ def query(sql: str, params: Sequence[Any] | None = None) -> list[dict[str, Any]]
         return [dict(r) for r in rows]
     conn = get_connection()
     with _lock:
+        import snowflake.connector
+
         cur = conn.cursor(snowflake.connector.DictCursor)
         try:
             cur.execute(sql, params or [])

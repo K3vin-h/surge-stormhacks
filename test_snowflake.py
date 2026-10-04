@@ -6,11 +6,14 @@ from dotenv import load_dotenv
 from cryptography.hazmat.primitives import serialization
 import snowflake.connector
 
-load_dotenv()
+REPO_ROOT = Path(__file__).resolve().parent
+load_dotenv(REPO_ROOT / ".env")
 
 
 def load_private_key() -> bytes:
     key_path = Path(os.environ["SNOWFLAKE_PRIVATE_KEY_PATH"])
+    if not key_path.is_absolute():
+        key_path = REPO_ROOT / key_path
     with key_path.open("rb") as f:
         p_key = serialization.load_pem_private_key(f.read(), password=None)
     return p_key.private_bytes(

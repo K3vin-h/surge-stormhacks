@@ -4,7 +4,7 @@ This extends the standalone Rasuwa map and evacuation-candidate routing migrated
 
 ## Run without a backend
 
-Use Node.js 20 or newer and Python 3 for the static development server:
+Use Node.js 20 or newer:
 
 ```sh
 cd frontend/rasuwa
@@ -77,12 +77,26 @@ To check or regenerate geographic preparation, use Python **3.11+**:
 
 ```sh
 cd frontend/rasuwa
-python3 -m venv tools/.venv
+python -m venv tools/.venv
+```
+
+Windows:
+
+```sh
+tools\.venv\Scripts\python -m pip install -r tools/requirements.txt
+tools\.venv\Scripts\python -m unittest discover -s tools -p "test_*.py" -v
+tools\.venv\Scripts\python tools/prepare.py
+```
+
+macOS and Linux:
+
+```sh
 tools/.venv/bin/python -m pip install -r tools/requirements.txt
 tools/.venv/bin/python -m unittest discover -s tools -p 'test_*.py' -v
-# After deliberately changing the source scenario or sensors.json:
 tools/.venv/bin/python tools/prepare.py
 ```
+
+Run `prepare.py` only after deliberately changing the source scenario or `sensors.json`.
 
 Preparation uses Shapely/pyproj to compute overlays and graph admission, once per dataset. It repairs polygon topology and clips projected bands back to original geographic coverage/wards. The prepared version includes a content fingerprint, so changing the scenario changes the version. The bundled-snapshot test detects drift. Regeneration has no network/provider dependency, no server process, and no training step. No importer refresh against live OSM is included: this migration intentionally retains the verified frozen source snapshot.
 

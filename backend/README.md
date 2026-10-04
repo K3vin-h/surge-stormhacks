@@ -10,11 +10,21 @@ From the repo root. `.env` is optional; see `.env.example`.
 
 ```bash
 python -m venv .venv
-.venv/Scripts/python -m pip install -r backend/requirements.txt
-.venv/Scripts/python -m uvicorn app.main:app --app-dir backend --host 127.0.0.1 --port 8008
 ```
 
-On macOS or Linux, use `.venv/bin/python` instead of `.venv/Scripts/python`.
+Windows:
+
+```bash
+.venv\Scripts\python -m pip install -r backend/requirements.txt
+.venv\Scripts\python -m uvicorn app.main:app --app-dir backend --host 127.0.0.1 --port 8008
+```
+
+macOS and Linux:
+
+```bash
+.venv/bin/python -m pip install -r backend/requirements.txt
+.venv/bin/python -m uvicorn app.main:app --app-dir backend --host 127.0.0.1 --port 8008
+```
 
 Without Snowflake settings, startup creates `backend/local.db` and seeds it from `app/db/seed.py` when the tables are empty. That file stays on the machine that is running the server and is not committed. Published directives and dismissed cases are stored there until a Snowflake account is configured.
 

@@ -1,4 +1,8 @@
 .env
+.env.*
+!.env.example
+*.p8
+*.pem
 rsa_key.p8
 rsa_key.pub
 __pycache__/
@@ -6,4 +10,8 @@ __pycache__/
 .venv/
 venv/
 node_modules/
-backend/local.db
+*.db
+*.sqlite
+*.sqlite3
+.DS_Store
+Thumbs.db

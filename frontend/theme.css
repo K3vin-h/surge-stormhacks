@@ -62,10 +62,10 @@ h1, h2, h3, h4 { margin: 0; letter-spacing: -0.02em; font-weight: 600; }
 .on-dark .emblem, .sidebar .emblem { background: #fffcf5; border-radius: 22%; padding: 12%; box-shadow: 0 2px 10px rgba(0, 0, 0, .25); }
 .wordmark { display: inline-flex; flex-direction: column; gap: .55em; line-height: 1; }
 .wm-word {
-  display: inline-flex; align-items: center; font-family: var(--font-brand); font-weight: 600;
-  letter-spacing: .3em; white-space: nowrap;
+  display: inline-flex; align-items: baseline; font-family: var(--font-brand); font-weight: 600;
+  letter-spacing: .3em; line-height: 1; margin-right: -.3em; white-space: nowrap;
 }
-.wm-e { display: block; flex: none; }
+.wm-e { display: block; flex: none; width: calc(66 / 70 * 1cap); height: 1cap; }
 .wm-tag {
   font-family: var(--font-brand); font-weight: 500; font-size: .3em; letter-spacing: .34em;
   text-transform: uppercase; color: var(--brand-sage); white-space: nowrap;

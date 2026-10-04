@@ -8,9 +8,20 @@ From the repo root, with Python 3.11+:
 
 ```sh
 python -m venv .venv
-.venv/Scripts/python -m pip install -r backend/requirements.txt   # Windows
-# source .venv/bin/activate && pip install -r backend/requirements.txt  # macOS/Linux
-.venv/Scripts/python -m uvicorn app.main:app --app-dir backend --host 127.0.0.1 --port 8008
+```
+
+Windows:
+
+```sh
+.venv\Scripts\python -m pip install -r backend/requirements.txt
+.venv\Scripts\python -m uvicorn app.main:app --app-dir backend --host 127.0.0.1 --port 8008
+```
+
+macOS and Linux:
+
+```sh
+.venv/bin/python -m pip install -r backend/requirements.txt
+.venv/bin/python -m uvicorn app.main:app --app-dir backend --host 127.0.0.1 --port 8008
 ```
 
 Open http://127.0.0.1:8008/ . The same server serves the home page, `/gov`, `/victim`, and `/rasuwa/`.
