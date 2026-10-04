@@ -62,6 +62,16 @@ class PreparationTests(unittest.TestCase):
                 self.assertFalse(result["graphs"]["walking"]["nodes"])
                 self.assertFalse(result["graphs"]["vehicle"]["nodes"])
 
+    def test_motorcar_permissions_override_general_motor_vehicle_prohibition(self):
+        for permission in ("yes", "designated", "permissive"):
+            with self.subTest(permission=permission):
+                data = fixture()
+                data["roads"][0]["properties"]["tags"].update(motor_vehicle="no", motorcar=permission)
+                self.assertTrue(prepare(data)["graphs"]["vehicle"]["nodes"])
+        data = fixture()
+        data["roads"][0]["properties"]["tags"]["motor_vehicle"] = "no"
+        self.assertFalse(prepare(data)["graphs"]["vehicle"]["nodes"])
+
     def test_hazard_crossing_edges_are_removed(self):
         data = fixture()
         data["hazards"] = polygon(85.003, 28.0005, 85.004, 28.0015)
