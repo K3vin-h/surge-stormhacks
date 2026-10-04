@@ -6,6 +6,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.db import bootstrap, snowflake_client as sf  # noqa: E402
+from app.errors import ApiError  # noqa: E402
 from app.schemas.common import GeoPoint, ReportKind, VerificationState  # noqa: E402
 from app.schemas.reports import SubmitReportRequest  # noqa: E402
 from app.services import reports  # noqa: E402
@@ -206,9 +207,37 @@ def test_no_device_id_never_dedupes():
 
 def test_concurrent_sos_from_one_device_makes_one_row():
     from concurrent.futures import ThreadPoolExecutor
+
+    def attempt(_):
+        try:
+            reports.submit(_req("d1"))
+        except ApiError:
+            pass  # duplicates are rejected, not inserted
+
     with ThreadPoolExecutor(8) as ex:
-        list(ex.map(lambda _: reports.submit(_req("d1")), range(8)))
+        list(ex.map(attempt, range(8)))
     assert len(_rows("d1")) == 1
+
+
+def test_repeat_sos_same_spot_is_rejected():
+    reports.submit(_req("d1"))
+    with pytest.raises(ApiError) as e:
+        reports.submit(_req("d1", msg="again"))
+    assert (e.value.status_code, e.value.code) == (409, "sos_already_sent")
+    r = _rows("d1")[0]
+    assert r["MESSAGE"] == "help"
+
+
+def test_repeat_sos_within_gps_jitter_is_rejected():
+    reports.submit(_req("d1"))
+    with pytest.raises(ApiError):
+        reports.submit(_req("d1", lng=85.00005, lat=28.00005))  # ~7 m
+
+
+def test_repeat_sos_after_moving_still_updates_pin():
+    first, *_ = reports.submit(_req("d1"))
+    second, created, moved = reports.submit(_req("d1", lng=85.001))  # ~100 m
+    assert (second.report_id, created, moved) == (first.report_id, False, True)
 
 
 def test_ensure_schema_adds_column_to_legacy_table():

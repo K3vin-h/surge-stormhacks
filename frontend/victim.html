@@ -865,7 +865,10 @@
             : `<span class="ok">${icon("check", 14)} Sent (${esc(VERIFICATION[r.verification_state] || r.verification_state)}). Emergency operations can see it now.</span>`;
           out.querySelector(".icon").style.display = "inline";
           refresh();
-        } catch (e) { out.innerHTML = `<span class="err">${esc(e.message)}</span>`; }
+        } catch (e) {
+          const dup = kind === "rescue_needed" && e.status === 409;
+          out.innerHTML = `<span class="err">${esc(dup ? e.detail : e.message)}</span>`;
+        }
         finally { btn.disabled = false; }
       };
     });

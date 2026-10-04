@@ -1,10 +1,12 @@
 """Community road/rescue reports, persisted to Snowflake REPORTS."""
 from __future__ import annotations
 
+import math
 import threading
 import uuid
 
 from ..db import snowflake_client as sf
+from ..errors import conflict
 from ..schemas.common import GeoPoint, ReportKind, VerificationState
 from ..schemas.reports import Report, SubmitReportRequest
 from ..util import now_utc
@@ -23,6 +25,16 @@ def _row_to_report(row: dict) -> Report:
         received_at=row["RECEIVED_AT"],
         provenance=row.get("PROVENANCE") or "resident_report",
     )
+
+
+# A repeat SOS within this distance (same area) is a duplicate, not a move.
+SAME_SPOT_METERS = 25.0
+
+
+def _meters_apart(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
+    dlat = math.radians(lat2 - lat1)
+    dlng = math.radians(lng2 - lng1) * math.cos(math.radians((lat1 + lat2) / 2))
+    return 6371000.0 * math.hypot(dlat, dlng)  # equirectangular, fine at this scale
 
 
 # Serializes check-then-write so a double-tap can't insert two SOS rows.
@@ -51,7 +63,8 @@ def _submit(req: SubmitReportRequest) -> tuple[Report, bool, bool]:
     """Returns (report, created, moved). Idempotent on idempotency_key when provided.
 
     A rescue_needed from a device that already has an unresolved one moves that
-    report (same REPORT_ID) instead of creating another.
+    report (same REPORT_ID) instead of creating another, or raises a 409
+    `sos_already_sent` if the device has not moved.
     """
     if req.idempotency_key:
         existing = sf.query_one(
@@ -79,6 +92,14 @@ def _submit(req: SubmitReportRequest) -> tuple[Report, bool, bool]:
             [req.device_id, ReportKind.rescue_needed.value, VerificationState.resolved.value],
         )
         if prior:
+            if prior["AREA_ID"] == req.area_id and _meters_apart(
+                prior["LATITUDE"], prior["LONGITUDE"], req.location.lat, req.location.lng
+            ) <= SAME_SPOT_METERS:
+                raise conflict(
+                    "Your location is already shared and you have already requested SOS. "
+                    "Responders can see you. Only send again if you have moved.",
+                    code="sos_already_sent",
+                )
             _remember_request(prior["AREA_ID"], prior.get("IDEMPOTENCY_KEY"), prior["REPORT_ID"])
             sf.execute(
                 """UPDATE REPORTS SET AREA_ID = %s, LONGITUDE = %s, LATITUDE = %s,
