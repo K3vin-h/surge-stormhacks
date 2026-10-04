@@ -71,7 +71,12 @@ async def _validation_handler(request, exc: RequestValidationError) -> JSONRespo
                 "message": "Invalid input.",
                 "retryable": False,
                 "request_id": request.headers.get("x-request-id", "n/a"),
-                "detail": exc.errors(),
+                # Validator context can contain exceptions; raw input may be
+                # nonfinite. Return only JSON-safe diagnostic fields.
+                "detail": [
+                    {key: error[key] for key in ("type", "loc", "msg")}
+                    for error in exc.errors()
+                ],
             }
         },
     )

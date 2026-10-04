@@ -200,7 +200,14 @@ _WITNESS = r"\b(see|saw|seeing|someone|somebody|people|person|neighbou?r|kids?|c
 _DANGER = (
     r"\b(stuck|trapped|stranded|drowning|swept|on the roof|injured|hurt|bleeding)\b"
 )
-_SELF_STATE = r"\b(i'?m|i am|we'?re|we are)\b.{0,20}\b(trapped|stuck|stranded|drowning|injured|hurt|bleeding|dying)\b"
+_SELF_STATE = r"\b(i'?m|i am|we'?re|we are)\b(?:(?!\b(see|saw|seeing|watching|helping|someone|somebody|person|neighbou?r|mother|father)\b)[^.!?;\n]){0,120}\b(trapped|stuck|stranded|drowning|injured|hurt|bleeding|dying)\b"
+_SELF_GROUP = r"\b(i|me|we|us) (and|with) [^.!?;\n]{0,80}\b(trapped|stuck|stranded|drowning|injured|hurt|bleeding|dying)\b"
+_SELF_INJURY = (
+    r"\bmy (legs?|arms?|hands?|feet|foot|head|body|chest|back|knees?|ankles?|"
+    r"shoulders?|neck|stomach|abdomen|belly|face|eyes?|ears?|nose|mouth|lips?|"
+    r"teeth|tooth|skin|bones?|wounds?|fingers?|toes?|wrists?|elbows?|hips?|"
+    r"thighs?|calf|calves|scalp|torso)\b[^.!?;\n]{0,40}\b(trapped|stuck|injured|hurt|bleeding)\b"
+)
 _SELF_PHRASE = r"\b(help|save|rescue) (me|us)\b|\bcan'?t get out\b|\bneed (a )?rescue\b"
 _ROADWORD = r"\b(road|bridge|street|highway|underpass|path|route|lane)\b"
 _HAZARD = r"\b(blocked|closed|flooded|washed|collapsed|under ?water|impassable|cut off|submerged)\b"
@@ -209,7 +216,7 @@ _HAZARD = r"\b(blocked|closed|flooded|washed|collapsed|under ?water|impassable|c
 def detect_event_keyword(text: str) -> str:
     q = (text or "").lower()
     # First-person distress wins over witness words ("trapped with my family").
-    if re.search(_SELF_STATE, q) or re.search(_SELF_PHRASE, q):
+    if any(re.search(pattern, q) for pattern in (_SELF_STATE, _SELF_GROUP, _SELF_INJURY, _SELF_PHRASE)):
         return "rescue_needed"
     # Witness report of someone else in danger.
     if re.search(_WITNESS, q) and re.search(_DANGER, q):

@@ -35,7 +35,7 @@ SEVERITY_BY_TYPE = {
 }
 
 
-def _fingerprint(req: PublishInstructionRequest) -> str:
+def _fingerprint(req: PublishInstructionRequest, *, include_schedule: bool = True) -> str:
     payload = {
         "area_id": req.area_id,
         "instruction_type": req.instruction_type.value,
@@ -44,9 +44,12 @@ def _fingerprint(req: PublishInstructionRequest) -> str:
         "approved_route_id": req.approved_route_id,
         "roads_to_avoid_ids": sorted(req.roads_to_avoid_ids),
         "cancels_instruction_id": req.cancels_instruction_id,
-        "update_frequency_minutes": req.update_frequency_minutes,
-        "next_update_at": req.next_update_at.isoformat() if req.next_update_at else None,
     }
+    if include_schedule:
+        payload.update(
+            update_frequency_minutes=req.update_frequency_minutes,
+            next_update_at=req.next_update_at.isoformat() if req.next_update_at else None,
+        )
     blob = json.dumps(payload, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(blob.encode()).hexdigest()
 
@@ -175,9 +178,14 @@ def _publish(req: PublishInstructionRequest) -> PublishedInstruction:
         "SELECT * FROM INSTRUCTIONS WHERE PUBLICATION_ID = %s", [req.publication_id]
     )
     if existing:
+        inst = _row_to_instruction(existing)
+        legacy_retry = (
+            existing.get("REQUEST_FINGERPRINT") == _fingerprint(req, include_schedule=False)
+            and inst.update_frequency_minutes == req.update_frequency_minutes
+            and inst.next_update_at == req.next_update_at
+        )
         # Idempotent replay (same id + same content) vs conflict.
-        if existing.get("REQUEST_FINGERPRINT") == fingerprint:
-            inst = _row_to_instruction(existing)
+        if existing.get("REQUEST_FINGERPRINT") == fingerprint or legacy_retry:
             # A replay must not roll the live cache back to an older instruction.
             cur = cache.get_current(inst.area_id)
             if cur is None or inst.published_at >= cur.published_at:

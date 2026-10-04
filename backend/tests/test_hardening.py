@@ -1,5 +1,6 @@
 import base64
 import io
+import json
 from types import SimpleNamespace
 
 import pytest
@@ -323,3 +324,63 @@ def test_voice_accepts_codec_suffixed_content_type(monkeypatch):
 def test_clear_slate_survives_marker_write_failure(local_db, monkeypatch, tmp_path):
     monkeypatch.setattr(slate, "CLEARED_MARKER", tmp_path / "missing-dir" / "marker")
     assert set(slate.clear_slate()) == {"reports", "instructions", "events", "roads"}
+
+
+@pytest.mark.parametrize("coords", [[200, 0], [0, 91], [float("nan"), 0], [0, float("inf")]])
+def test_invalid_report_coordinates_return_json_422(coords):
+    from app.main import app
+    body = {"area_id": "sunsari", "kind": "road_hazard", "message": "road closed",
+            "location": {"type": "Point", "coordinates": coords}}
+    response = TestClient(app, raise_server_exceptions=False).post(
+        "/api/public/reports", content=json.dumps(body), headers={"Content-Type": "application/json"})
+    assert response.status_code == 422
+    assert response.json()["error"]["detail"]
+
+
+def test_nonfinite_chat_coordinate_returns_json_422():
+    from app.main import app
+    response = TestClient(app, raise_server_exceptions=False).post(
+        "/api/chat", content='{"area_id":"sunsari","question":"help","latitude":NaN}',
+        headers={"Content-Type": "application/json"})
+    assert response.status_code == 422
+
+
+@pytest.mark.parametrize("message", [
+    "my leg is bleeding", "me and my family are trapped",
+    "we are on the second floor of our home and trapped",
+    "my ankle is bleeding", "my knee is injured", "my shoulder is hurt",
+])
+def test_self_distress_remains_an_sos(message):
+    assert gemini.detect_event_keyword(message) == "rescue_needed"
+
+
+@pytest.mark.parametrize("message", ["my ankle is bleeding", "me and my family are trapped", "we are on the second floor of our home and trapped"])
+def test_keyword_sos_is_filed_through_chat_api(local_db, monkeypatch, message):
+    from app.main import app
+    monkeypatch.setattr(gemini, "converse", lambda *a, **kw: None)
+    response = TestClient(app).post("/api/chat", json={
+        "area_id": "sunsari", "question": message, "latitude": 28, "longitude": 85,
+        "device_id": "keyword-test",
+    })
+    assert response.status_code == 200
+    assert response.json()["report_filed"] is True
+    assert response.json()["report_kind"] == "rescue_needed"
+
+
+def test_legacy_publication_retry_still_checks_schedule(local_db):
+    import hashlib
+    req = _pub("legacy", update_frequency_minutes=30)
+    stored = instructions.publish(req)
+    legacy = {
+        "area_id": req.area_id, "instruction_type": req.instruction_type.value,
+        "emergency_message": req.emergency_message, "shelter_id": req.shelter_id,
+        "approved_route_id": req.approved_route_id,
+        "roads_to_avoid_ids": sorted(req.roads_to_avoid_ids),
+        "cancels_instruction_id": req.cancels_instruction_id,
+    }
+    digest = hashlib.sha256(json.dumps(legacy, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+    sf.execute("UPDATE INSTRUCTIONS SET REQUEST_FINGERPRINT = %s WHERE PUBLICATION_ID = %s", [digest, req.publication_id])
+    assert instructions.publish(req).publication_id == stored.publication_id
+    with pytest.raises(ApiError) as exc:
+        instructions.publish(_pub("legacy", update_frequency_minutes=60))
+    assert exc.value.code == "idempotency_conflict"
