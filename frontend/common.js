@@ -1,12 +1,13 @@
 // Shared helpers for the SURGE government workspace and resident app.
 // Served same-origin by FastAPI, so the API base is just "".
 
-const AREAS = ["sunsari", "saptari", "bardiya", "kathmandu_valley", "rasuwa"];
+const AREAS = ["sunsari", "saptari", "bardiya", "kathmandu_valley", "sfu", "rasuwa"];
 const AREA_LABELS = {
   sunsari: "Sunsari",
   saptari: "Saptari",
   bardiya: "Bardiya",
   kathmandu_valley: "Kathmandu Valley",
+  sfu: "SFU (Burnaby Mtn)",
   rasuwa: "Rasuwa",
 };
 
@@ -16,6 +17,7 @@ const AREA_CENTERS = {
   saptari: [26.616, 86.998],
   bardiya: [28.3, 81.433],
   kathmandu_valley: [27.709, 85.324],
+  sfu: [49.2781, -122.9199], // Simon Fraser University, Burnaby Mountain
   rasuwa: [28.20, 85.30], // prepared.json road nodes centre ~[28.185, 85.351]
 };
 

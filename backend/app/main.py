@@ -16,7 +16,7 @@ from .db import snowflake_client as sf
 from .db.bootstrap import ensure_schema
 from .db.seed import seed_samples
 from .errors import ApiError, api_error_handler, unhandled_error_handler
-from .routers import areas, chat, demo_models, government, health, public
+from .routers import areas, chat, demo_models, government, health, public, twilio_sms
 from .services import instructions
 
 log = logging.getLogger("surge")
@@ -88,6 +88,7 @@ app.include_router(government.router)
 app.include_router(public.router)
 app.include_router(chat.router)
 app.include_router(demo_models.router)
+app.include_router(twilio_sms.router)
 
 # Serve the bare-bones static frontend (gov dashboard + victim view).
 FRONTEND_DIR = Path(__file__).resolve().parents[2] / "frontend"

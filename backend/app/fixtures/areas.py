@@ -273,6 +273,79 @@ AREAS: dict[str, dict[str, Any]] = {
              "location": {"type": "Point", "coordinates": [85.319, 27.668]}},
         ],
     },
+    # SFU Burnaby Mountain campus (Simon Fraser University), Burnaby BC. A
+    # SIMULATED mock flood for the live demo: an atmospheric-river flash flood
+    # plus landslides on Burnaby Mountain that wash out the access roads and
+    # strand people on campus. Coordinates are real SFU/Burnaby locations;
+    # the counts and signals are invented for the scenario.
+    "sfu": {
+        "name": "SFU (Burnaby Mtn)",
+        "center": [-122.9199, 49.2781],
+        "population": 35_000,
+        "distress_calls": 57,
+        "injuries": 9,
+        "vulnerable_population": 6_000,
+        "road_accessibility": 0.40,
+        "signals": {
+            "rainfall_mm": 305,       # extreme atmospheric river
+            "river_level_m": 5.2,     # Stoney/Eagle Creek + stormwater surge proxy
+            "elevation_m": 365,       # Burnaby Mountain summit
+            "slope_deg": 18.0,        # steep mountain flanks -> landslide risk
+            "soil_moisture": 0.95,    # fully saturated
+            "forecast_severity": 0.9,
+        },
+        "shelters": [
+            {"id": "lorne_davies_complex", "name": "Lorne Davies Complex (Recreation)",
+             "capacity": 2500, "location": {"type": "Point", "coordinates": [-122.9215, 49.2767]}},
+            {"id": "sfu_sub", "name": "SFU Student Union Building",
+             "capacity": 1500, "location": {"type": "Point", "coordinates": [-122.9178, 49.2788]}},
+            {"id": "wac_bennett_library", "name": "W.A.C. Bennett Library",
+             "capacity": 1200, "location": {"type": "Point", "coordinates": [-122.9143, 49.2786]}},
+            {"id": "convocation_mall", "name": "Convocation Mall (covered)",
+             "capacity": 1800, "location": {"type": "Point", "coordinates": [-122.9166, 49.2792]}},
+            {"id": "univercity_community_centre", "name": "UniverCity Community Centre",
+             "capacity": 900, "location": {"type": "Point", "coordinates": [-122.9120, 49.2797]}},
+        ],
+        "routes": [
+            {"id": "gaglardi_descent", "name": "Gaglardi Way Descent",
+             "geometry": {"type": "LineString", "coordinates": [
+                 [-122.9199, 49.2781], [-122.9150, 49.2700], [-122.9050, 49.2620]]}},
+            {"id": "production_way_trail", "name": "Production Way Station Trail",
+             "geometry": {"type": "LineString", "coordinates": [
+                 [-122.9199, 49.2781], [-122.9180, 49.2680], [-122.9179, 49.2546]]}},
+            {"id": "university_dr_west_exit", "name": "University Drive West Exit",
+             "geometry": {"type": "LineString", "coordinates": [
+                 [-122.9199, 49.2781], [-122.9280, 49.2760], [-122.9380, 49.2720]]}},
+            {"id": "burnaby_mtn_pkwy_north", "name": "Burnaby Mountain Parkway North",
+             "geometry": {"type": "LineString", "coordinates": [
+                 [-122.9199, 49.2781], [-122.9250, 49.2850], [-122.9350, 49.2900]]}},
+            {"id": "curtis_street_link", "name": "Curtis Street Link",
+             "geometry": {"type": "LineString", "coordinates": [
+                 [-122.9199, 49.2781], [-122.9300, 49.2830], [-122.9450, 49.2830]]}},
+        ],
+        "roads": [
+            {"id": "gaglardi_way", "name": "Gaglardi Way", "status": "closed",
+             "geometry": {"type": "Point", "coordinates": [-122.9120, 49.2680]}},
+            {"id": "tower_road", "name": "Tower Road (Bus Loop)", "status": "closed",
+             "geometry": {"type": "Point", "coordinates": [-122.9220, 49.2780]}},
+            {"id": "burnaby_mountain_parkway", "name": "Burnaby Mountain Parkway", "status": "restricted",
+             "geometry": {"type": "Point", "coordinates": [-122.9300, 49.2870]}},
+            {"id": "south_science_road", "name": "South Science Road", "status": "restricted",
+             "geometry": {"type": "Point", "coordinates": [-122.9170, 49.2762]}},
+            {"id": "university_drive_east", "name": "University Drive East", "status": "open",
+             "geometry": {"type": "Point", "coordinates": [-122.9130, 49.2790]}},
+            {"id": "university_high_street", "name": "University High Street", "status": "open",
+             "geometry": {"type": "Point", "coordinates": [-122.9120, 49.2800]}},
+        ],
+        "hospitals": [
+            {"id": "burnaby_hospital", "name": "Burnaby Hospital",
+             "location": {"type": "Point", "coordinates": [-122.9856, 49.2486]}},
+            {"id": "sfu_health_counselling", "name": "SFU Health & Counselling (Maggie Benston)",
+             "location": {"type": "Point", "coordinates": [-122.9185, 49.2790]}},
+            {"id": "eagle_ridge_hospital", "name": "Eagle Ridge Hospital (Port Moody)",
+             "location": {"type": "Point", "coordinates": [-122.8430, 49.2830]}},
+        ],
+    },
     # Resident routing for Rasuwa uses the client-side road graph, so the
     # catalog is empty. Counts and signals are PLACEHOLDER simulated values,
     # not observations.

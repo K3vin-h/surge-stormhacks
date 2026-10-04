@@ -825,8 +825,7 @@
       const inst = state.status && state.status.instruction;
       const area = esc(AREA_LABELS[state.current]);
       if (!inst) {
-        $("live").innerHTML = `<div class="lbl"><span class="beacon calm"></span>Live now · ${area}</div>
-          <h3>No active instruction</h3><p>Residents in ${area} haven't received an official instruction yet.</p>`;
+        $("live").innerHTML = `<h3>No active instruction</h3><p>Residents in ${area} haven't received an official instruction yet.</p>`;
         return;
       }
       const info = instructionInfo(inst.instruction_type);
@@ -836,7 +835,6 @@
       if (inst.roads_to_avoid && inst.roads_to_avoid.length) facts.push(["❌", `Avoid ${inst.roads_to_avoid.map((r) => r.name).join(", ")}`]);
       const calm = inst.instruction_type === "all_clear" || inst.instruction_type === "advisory";
       $("live").innerHTML = `
-        <div class="lbl"><span class="beacon ${calm ? "calm" : ""}"></span>Live now · ${area}</div>
         <h3>${TYPE_EMOJI[inst.instruction_type] || ""} ${esc(info.label)}<span class="sev">${esc(inst.severity)}</span></h3>
         <p>${esc(inst.emergency_message)}</p>
         ${facts.length ? `<div class="facts">${facts.map(([e, t]) => `<div><span>${e}</span><span>${esc(t)}</span></div>`).join("")}</div>` : ""}
