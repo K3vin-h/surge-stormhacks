@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>SURGE — Rasuwa Route Planner</title>
+  <link rel="stylesheet" href="vendor/maplibre-gl.css" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header><a class="brand" href="../index.html">SURGE <span>Rasuwa Route Planner</span></a><nav aria-label="SURGE navigation"><a href="../gov.html">Government</a><a href="../victim.html">Resident app</a></nav></header>
+  <div class="simulation">Hackathon simulation. Real mapped geography; simulated flood scenario. No live emergency guidance.</div>
+  <main>
+    <div class="intro"><div><p class="eyebrow">RASUWA / GOSAIKUNDA, NEPAL</p><h1>Compare nearby destinations.</h1><p>Choose a village, inspect mapped routes, and review access before making a decision.</p></div><span class="badge">Runs in your browser</span></div>
+    <div id="load-error" role="alert" hidden></div>
+    <div class="workspace">
+      <aside aria-label="Route planning">
+        <h2>Route planning</h2>
+        <label for="village">Origin village</label>
+        <select id="village" disabled><option value="">Select a mapped village</option></select>
+        <fieldset class="modes" disabled id="mode-controls"><legend>Travel mode</legend><label><input type="radio" name="mode" value="walking" checked />Walking</label><label><input type="radio" name="mode" value="vehicle" />Vehicle</label></fieldset>
+        <fieldset class="limits"><legend>Maximum mapped-route distance</legend><label for="walking-limit">Walking limit (metres)</label><input id="walking-limit" type="number" min="1" max="50000" step="any" inputmode="decimal" disabled /><label for="vehicle-limit">Vehicle limit (metres)</label><input id="vehicle-limit" type="number" min="1" max="50000" step="any" inputmode="decimal" disabled /></fieldset>
+        <p class="note">Routes follow mapped roads and paths. Distance excludes the unverified final approach. Nearby grass, meadows, schools, and community facilities are candidates for review.</p>
+        <p id="route-status" role="status">Loading bundled geographic data…</p>
+        <div id="candidates" aria-label="Candidate destinations"></div>
+        <section id="selection" hidden aria-label="Route review"><h2>Selected route</h2><p id="selected-name"></p><p id="selected-distance"></p><ul id="unknowns"></ul><a id="evidence" target="_blank" rel="noopener noreferrer" hidden>Inspect mapped destination</a><p class="note">Selection is local to this page and resets on reload. It does not publish an instruction or establish that the destination is safe.</p></section>
+        <details id="excluded" hidden><summary>Why other destinations were excluded</summary><ul id="exclusions"></ul></details>
+      </aside>
+      <section class="map-workspace" aria-label="Geographic map and risk legend">
+        <div class="map-toolbar"><span id="dataset-label">Rasuwa geographic workspace</span><button id="overview" disabled>Map overview</button></div>
+        <div class="map-frame"><div id="map" aria-label="Satellite map of Rasuwa"></div><div id="map-caption">Strong outlines: real mapped ward cells • white dots: villages</div></div>
+        <p id="map-notice" role="status" hidden></p>
+        <div class="risk-legend" aria-label="Flood risk legend"><span>🔴 Extreme risk</span><span>🟠 High risk</span><span>🟡 Moderate risk</span><span>🟢 Low risk</span><small>Simulated proximity bands. Green does not establish safety. Uncolored areas are unassessed.</small></div>
+        <p class="note">White boundaries: wards · purple patches: mapped open ground · cyan routes: walking · white routes: vehicle.</p>
+        <p id="scenario" class="note"></p>
+        <p class="note">High-ground certification needs reviewed elevation, slope, and access evidence. Terrain tilt is a camera view, not measured terrain. No trained flood-risk or satellite-damage model is included.</p>
+      </section>
+    </div>
+  </main>
+  <noscript>JavaScript is required to display geographic data and calculate routes.</noscript>
+  <script type="module">
+    import('./app.js').catch(() => {
+      const error = document.getElementById('load-error');
+      error.hidden = false;
+      error.textContent = 'The map application could not start. Run npm ci in frontend/rasuwa to prepare local MapLibre assets, then reload.';
+    });
+  </script>
+</body>
+</html>
