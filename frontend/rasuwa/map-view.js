@@ -1,9 +1,10 @@
 import * as maplibre from './vendor/maplibre-gl.mjs';
+import { statusFeatures } from './road-status.js';
 
 const collection = features => ({ type: 'FeatureCollection', features });
 const empty = collection([]);
 
-export function createMap(element, data, { config, onVillage, onNotice, onCell }) {
+export function createMap(element, data, { config, onVillage, onNotice, onCell, onRoad }) {
   maplibre.setWorkerUrl(new URL('./vendor/maplibre-gl-worker.mjs', import.meta.url).href);
   const hasImagery = !!(config.satelliteTiles && config.satelliteAttribution);
   const map = new maplibre.Map({
@@ -18,6 +19,7 @@ export function createMap(element, data, { config, onVillage, onNotice, onCell }
   });
   let ready = false;
   let pending = { candidates: [], selected: null };
+  let picking = false, pendingRoads = [], pendingSelected = null;
   map.addControl(new maplibre.NavigationControl({ visualizePitch: true }), 'top-right');
   map.addControl(new maplibre.AttributionControl({ compact: true, customAttribution: '© OpenStreetMap contributors' }), 'bottom-right');
   if (!hasImagery) onNotice('Satellite imagery is disabled. Local geographic overlays and routing remain available.');
@@ -41,12 +43,21 @@ export function createMap(element, data, { config, onVillage, onNotice, onCell }
     }
   }
 
+  function setRoadStatus(roads) {
+    pendingRoads = roads;
+    if (ready) map.getSource('road-status').setData(collection(statusFeatures(data.roads, roads)));
+  }
+  function selectRoad(id) {
+    pendingSelected = id;
+    if (ready) map.getSource('road-selected').setData(collection(id ? data.roads.features.filter(feature => feature.properties.id === id) : []));
+  }
+
   // Style readiness does not depend on remote satellite tiles succeeding.
   map.once('style.load', () => {
     for (const [id, value] of Object.entries({
       district: data.district, wards: data.wards, settlements: data.settlements, facilities: data.facilities,
       'open-ground': data.open_ground, 'risk-zones': data.risk_zones, roads: data.roads,
-      hazards: collection([{ type: 'Feature', properties: {}, geometry: data.hazards }]), routes: empty, destinations: empty
+      hazards: collection([{ type: 'Feature', properties: {}, geometry: data.hazards }]), routes: empty, destinations: empty, 'road-status': empty, 'road-selected': empty
     })) map.addSource(id, { type: 'geojson', data: value });
     const layer = (id, type, source, paint, layout) => map.addLayer({ id, type, source, paint, ...(layout ? { layout } : {}) });
     layer('district-fill', 'fill', 'district', { 'fill-color': '#64748b', 'fill-opacity': 0.45 });
@@ -71,6 +82,15 @@ export function createMap(element, data, { config, onVillage, onNotice, onCell }
     map.setFilter('paths-line', ['in', ['get', 'highway'], ['literal', ['path', 'footway', 'steps', 'track']]]);
     layer('closed-roads', 'line', 'roads', { 'line-color': '#f43f5e', 'line-width': 4, 'line-dasharray': [2, 1] });
     map.setFilter('closed-roads', ['==', ['get', 'closed'], true]);
+    // Government road status: red long dashes = closed, blue short dashes = flooded (shape differs, not only colour).
+    layer('road-status-halo', 'line', 'road-status', { 'line-color': '#0f172a', 'line-width': 8 });
+    layer('road-status-closed', 'line', 'road-status', { 'line-color': '#dc2626', 'line-width': 5, 'line-dasharray': [4, 1.5] });
+    layer('road-status-flooded', 'line', 'road-status', { 'line-color': '#2563eb', 'line-width': 5, 'line-dasharray': [1, 1] });
+    map.setFilter('road-status-closed', ['==', ['get', 'status'], 'closed']);
+    map.setFilter('road-status-flooded', ['==', ['get', 'status'], 'flooded']);
+    layer('road-selected', 'line', 'road-selected', { 'line-color': '#fde047', 'line-width': 11, 'line-opacity': 0.75 });
+    // Wide transparent hit area so thin roads are clickable.
+    layer('roads-hit', 'line', 'roads', { 'line-color': '#000', 'line-opacity': 0, 'line-width': 18 });
     layer('route-halo', 'line', 'routes', { 'line-color': '#142b38', 'line-width': 9 });
     layer('routes-line', 'line', 'routes', { 'line-color': ['match', ['get', 'mode'], 'walking', '#67e8f9', '#c4b5fd'], 'line-width': 5 });
     layer('facilities-points', 'circle', 'facilities', { 'circle-color': '#b3cbd0', 'circle-radius': 4 });
@@ -86,15 +106,25 @@ export function createMap(element, data, { config, onVillage, onNotice, onCell }
       const p = event.features?.[0]?.properties;
       if (p) onCell(`${p.ward_name}: ${p.risk_level === 'Unknown' && p.sensor_risk_level ? `${p.sensor_risk_level} risk (ward sensor reading only, outside the hazard analysis)` : `${p.risk_level} risk`} · ${p.provenance}. ${p.observed_at ? `Rain ${p.rainfall_mm_24h} mm/24h · river/warning ${p.river_level_ratio} · soil ${p.soil_moisture_pct}% · observed ${p.observed_at}` : 'No sensor assessment available.'}`);
     });
+    map.on('click', 'roads-hit', event => {
+      if (map.queryRenderedFeatures(event.point, { layers: ['village-points'] }).length) return; // village click wins
+      const properties = event.features?.[0]?.properties;
+      if (picking && typeof properties?.id === 'string') onRoad(properties);
+    });
+    map.on('mouseenter', 'roads-hit', () => { if (picking) map.getCanvas().style.cursor = 'crosshair'; });
+    map.on('mouseleave', 'roads-hit', () => { map.getCanvas().style.cursor = ''; });
     map.on('mouseenter', 'village-points', () => { map.getCanvas().style.cursor = 'pointer'; });
     map.on('mouseleave', 'village-points', () => { map.getCanvas().style.cursor = ''; });
     ready = true;
+    setRoadStatus(pendingRoads);
+    selectRoad(pendingSelected);
     map.resize();
     update(pending.candidates, pending.selected);
     element.dataset.mapReady = 'true';
   });
   return {
-    update,
+    update, setRoadStatus, selectRoad,
+    setPicking: value => { picking = value; },
     overview: () => map.jumpTo({ center: [85.35, 28.2], zoom: 11, pitch: 0, bearing: 0 }),
     destroy: () => { observer.disconnect(); map.remove(); }
   };

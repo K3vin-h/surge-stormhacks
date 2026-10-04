@@ -1,14 +1,62 @@
 import { recommend } from './routing.js';
 import { createMap } from './map-view.js';
 import { mapConfig } from './config.js';
+import { blockedIds } from './road-status.js';
 
 const element = id => document.getElementById(id);
 const village = element('village');
 const inputs = { walking: element('walking-limit'), vehicle: element('vehicle-limit') };
 let data, map;
-let candidates = [];
+let candidates = [], chosen = null, blocked = [];
+// Latest road statuses; registered at module top level so an event fired before start() finishes is never lost.
+let roadState = { roads: [], connected: false, loaded: false };
+
+function applyRoads() {
+  map?.setRoadStatus(roadState.roads);
+  map?.setPicking(roadState.connected);
+  const next = blockedIds(roadState.roads);
+  if (next.join() === blocked.join()) return;
+  blocked = next;
+  search(true);
+}
+
+function roadNotice(text) {
+  let notice = element('road-notice');
+  if (!notice) {
+    notice = document.createElement('p');
+    notice.id = 'road-notice';
+    notice.setAttribute('role', 'alert');
+    element('route-status').before(notice);
+  }
+  notice.hidden = !text;
+  notice.textContent = text || '';
+}
+
+// government.js publishes statuses after "Connect government API"; they supersede the public fetch below.
+window.addEventListener('road-status', ({ detail }) => {
+  roadState = { roads: detail.roads, connected: detail.connected, loaded: true };
+  roadNotice('');
+  applyRoads();
+});
+
+// Closures are public: fetch them on start so routes avoid closed roads before any government login.
+async function loadPublicRoads() {
+  try {
+    const response = await fetch('/api/public/roads/status', { signal: AbortSignal.timeout(15000) });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const body = await response.json();
+    if (!Array.isArray(body?.roads)) throw new Error('malformed body');
+    if (roadState.loaded) return; // a newer government update already won
+    roadState = { roads: body.roads, connected: false, loaded: true };
+    roadNotice('');
+    applyRoads();
+  } catch {
+    if (!roadState.loaded) roadNotice('Road closure information could not be loaded. Routes may use closed or flooded roads.');
+  }
+}
 
 function select(candidate) {
+  chosen = candidate;
   element('selection').hidden = !candidate;
   for (const button of element('candidates').children) button.setAttribute('aria-pressed', String(button.dataset.destination === candidate?.destination.shelter_id));
   if (candidate) {
@@ -33,7 +81,8 @@ function select(candidate) {
   map?.update(candidates, candidate);
 }
 
-function search() {
+function search(afterClosure = false) {
+  const previous = chosen?.destination;
   candidates = [];
   element('candidates').replaceChildren();
   element('excluded').hidden = true;
@@ -50,9 +99,11 @@ function search() {
     return;
   }
   try {
-    const result = recommend(data, { origin: village.value, mode, maxDistance: limit });
+    const result = recommend(data, { origin: village.value, mode, maxDistance: limit, blocked });
     candidates = result.candidates;
     element('route-status').textContent = result.message;
+    const kept = afterClosure && previous && candidates.find(c => c.destination.shelter_id === previous.shelter_id);
+    if (afterClosure && previous && !kept) element('route-status').textContent += ` A road closure removed the previously selected destination (${previous.name}); choose another.`;
     for (const candidate of candidates) {
       const button = document.createElement('button');
       button.type = 'button';
@@ -77,6 +128,7 @@ function search() {
     }));
     element('excluded').hidden = !Object.keys(result.exclusions).length;
     map?.update(candidates, null);
+    if (kept) select(kept); // re-routed around the closure; the route may have changed
   } catch (error) {
     element('route-status').textContent = error.message;
   }
@@ -118,6 +170,7 @@ async function start() {
         config: mapConfig,
         onVillage: id => { village.value = id; search(); },
         onNotice: text => { element('map-notice').hidden = false; element('map-notice').textContent = text; },
+        onRoad: properties => { map.selectRoad(properties.id); window.dispatchEvent(new CustomEvent('road-pick', { detail: properties })); },
         onCell: text => { element('map-caption').textContent = text; }
       });
       element('overview').disabled = false;
@@ -127,9 +180,12 @@ async function start() {
       element('map-notice').hidden = false;
       element('map-notice').textContent = 'The map renderer could not start. Enable WebGL or use a supported browser. The village list and route search remain available.';
     }
-    village.addEventListener('change', search);
-    for (const input of Object.values(inputs)) input.addEventListener('input', search);
-    for (const radio of document.querySelectorAll('input[name=mode]')) radio.addEventListener('change', search);
+    map?.setRoadStatus(roadState.roads);
+    map?.setPicking(roadState.connected);
+    const rerun = () => search();
+    village.addEventListener('change', rerun);
+    for (const input of Object.values(inputs)) input.addEventListener('input', rerun);
+    for (const radio of document.querySelectorAll('input[name=mode]')) radio.addEventListener('change', rerun);
     search();
   } catch (error) {
     data = null;
@@ -139,4 +195,5 @@ async function start() {
   }
 }
 
+void loadPublicRoads();
 await start();

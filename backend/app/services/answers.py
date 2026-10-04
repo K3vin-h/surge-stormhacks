@@ -13,7 +13,7 @@ from ..fixtures import areas as fx
 from ..schemas.chat import AssistantResponse
 from ..schemas.common import InstructionType
 from ..schemas.instructions import PublishedInstruction
-from . import cache, gemini, memory, reports as reports_svc
+from . import cache, gemini, memory, reports as reports_svc, road_status
 
 AUTHORITY_LINE = "Contact your local emergency authority for anything not covered here."
 
@@ -83,6 +83,15 @@ def build_context(area_id: str) -> str:
     a = fx.get_area(area_id) or {}
     lines = [f"Area: {a.get('name', area_id)} ({area_id})."]
     inst = cache.get_current(area_id)
+    if a.get("placeholder"):
+        lines.append("No risk data is available for this area.")
+        if area_id == road_status.AREA_ID:
+            closed = [
+                f"{r.road_id}" + (f" ({r.note})" if r.note else "")
+                for r in road_status.list_roads().roads
+            ]
+            if closed:
+                lines.append("Currently closed or flooded roads: " + ", ".join(closed) + ".")
     if inst:
         lines.append(f"Current official instruction: {inst.instruction_type.value}.")
         lines.append(f"Official message: {inst.emergency_message}")

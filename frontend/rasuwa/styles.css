@@ -108,6 +108,11 @@ summary { cursor: pointer; color: var(--ink-2); font-weight: 600; }
 .area-button:hover:not(:disabled) { background: var(--surface-2); }
 .area-button[aria-pressed=true] { background: var(--sage); border-color: var(--forest-3); color: var(--sage-ink); font-weight: 600; }
 #gov-refresh-model { margin-top: 6px; }
+#gov-road { margin-top: 22px; max-width: 520px; }
+#gov-road-name { font-weight: 600; overflow-wrap: anywhere; }
+.road-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.road-actions button:focus-visible, #gov-road-note:focus-visible { outline: 3px solid var(--forest-3, #2563eb); outline-offset: 2px; }
+#gov-road-status { font-size: 13px; color: var(--teal); }
 
 /* Embedded in the government dashboard drawer (?embed=1): the host page supplies navigation and directives. */
 .embed .shell { display: block; background: none; min-height: 0; }

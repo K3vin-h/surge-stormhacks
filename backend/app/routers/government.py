@@ -1,9 +1,11 @@
 """Government workspace routes: dashboard, refresh, publish, alerts, reports."""
 from __future__ import annotations
 
+import re
+
 from fastapi import APIRouter, Query
 
-from ..errors import not_found
+from ..errors import not_found, validation_error
 from ..fixtures import areas as fx
 from ..schemas.areas import AreaDetail
 from ..schemas.common import AREA_IDS
@@ -14,16 +16,20 @@ from ..schemas.instructions import (
     PublishInstructionRequest,
     PublishResponse,
 )
+from ..schemas.roads import RoadStatus, SetRoadStatusRequest
 from ..schemas.reports import Report, ReportsResponse, UpdateReportStateRequest
-from ..services import cache, events, instructions, models, reports as reports_svc, slate
+from ..services import cache, events, instructions, models, reports as reports_svc, road_status, slate
 from ..util import decode_cursor, next_cursor, now_utc
 
 router = APIRouter(prefix="/api/government")
 
+_ROAD_ID = re.compile(r"osm-way-\d+")
+
 
 @router.get("/dashboard", response_model=GovDashboardResponse)
 def dashboard() -> GovDashboardResponse:
-    summaries = [models.build_summary(aid) for aid in AREA_IDS]
+    summaries = [models.build_summary(aid) for aid in AREA_IDS
+                 if not (fx.get_area(aid) or {}).get("placeholder")]
     ranked = sorted(summaries, key=lambda s: s.priority.score, reverse=True)
     areas = []
     for s in ranked:
@@ -106,8 +112,17 @@ def gov_reports(
 
 @router.post("/reset")
 def reset_slate() -> dict[str, int]:
-    """Delete every report, official message, and activity entry."""
+    """Delete every report, official message, activity entry, and road status."""
     return slate.clear_slate()
+
+
+@router.put("/roads/{road_id}", response_model=RoadStatus)
+def set_road_status(road_id: str, req: SetRoadStatusRequest) -> RoadStatus:
+    if len(road_id) > 40 or not _ROAD_ID.fullmatch(road_id):
+        raise validation_error("road_id must look like 'osm-way-<digits>'.")
+    if road_id not in road_status.allowed_road_ids():
+        raise not_found(f"Unknown road '{road_id}'.")
+    return road_status.set_status(road_id, req.status, req.note)
 
 
 @router.patch("/reports/{report_id}", response_model=Report)

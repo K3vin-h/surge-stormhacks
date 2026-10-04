@@ -1,4 +1,5 @@
 """Create the durable tables if they do not exist. Idempotent."""
+
 from __future__ import annotations
 
 from . import snowflake_client as sf
@@ -54,6 +55,14 @@ DDL = [
         AREA_ID     STRING,
         SUMMARY     STRING NOT NULL,
         CREATED_AT  TIMESTAMP_TZ NOT NULL
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS ROAD_STATUS (
+        ROAD_ID    TEXT NOT NULL PRIMARY KEY,
+        STATUS     TEXT NOT NULL,
+        NOTE       TEXT,
+        UPDATED_AT TIMESTAMP_TZ NOT NULL
     )
     """,
 ]
