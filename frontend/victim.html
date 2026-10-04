@@ -286,9 +286,9 @@
             <button data-q="Which roads should I avoid right now?">Roads to avoid</button>
           </div>
           <div class="chat" id="chat"></div>
-          <div id="agentStatus" class="muted"></div>
+          <div id="agentStatus" class="muted" role="status" aria-live="polite"></div>
           <div class="composer">
-            <button class="round mic" id="callBtn" aria-label="Tap to talk"><span data-icon="mic"></span></button>
+            <button class="round mic" id="callBtn" aria-label="Start live call" aria-pressed="false"><span data-icon="mic"></span></button>
             <input id="q" type="text" placeholder="Ask in any language…" autocomplete="off" />
             <button class="round send" id="sendBtn" aria-label="Send"><span data-icon="send"></span></button>
           </div>
@@ -634,8 +634,10 @@
       $("agentStatus").textContent = label;
     }
 
-    let audio = null;
+    let audio = null, ttsPending = 0, ttsGen = 0;
     async function playTts(payload, btn) {
+      const gen = ++ttsGen;
+      ttsPending++;
       const original = btn ? btn.innerHTML : null;
       if (btn) btn.innerHTML = `<span class="spinner"></span>${btn.classList.contains("replay") ? "" : "Loading"}`;
       try {
@@ -645,11 +647,13 @@
         });
         if (!res.ok) { if (btn) toast("Audio isn’t available right now.", { error: true }); return; }
         const blob = await res.blob();
+        if (gen !== ttsGen) return; // cancelled by barge-in / end of call / newer clip
         if (audio) audio.pause();
         audio = new Audio(URL.createObjectURL(blob));
         await audio.play();
       } catch (_) {
       } finally {
+        ttsPending--;
         if (btn) btn.innerHTML = original;
       }
     }
@@ -669,13 +673,13 @@
       }
     }
 
-    function handleAgent(r) {
+    function handleAgent(r, speak = true) {
       lastResponseId = r.response_id;
       userLang = r.language || userLang;
       updateLangBadge();
       addMsg("agent", `Assistant · ${modeLabel(r.mode)}`, r.text, r.response_id);
       noteAutoReport(r);
-      playTts({ kind: "assistant_response", response_id: r.response_id });
+      if (speak) playTts({ kind: "assistant_response", response_id: r.response_id });
     }
 
     async function sendChat(question, who = "You") {
@@ -703,51 +707,132 @@
     $("q").addEventListener("keydown", (e) => { if (e.key === "Enter") $("sendBtn").click(); });
     $("suggest").querySelectorAll("button").forEach((b) => { b.onclick = () => sendChat(b.dataset.q, b.dataset.who || "You"); });
 
-    // Voice: tap to record, tap to stop -> /api/voice (STT + agent) -> TTS.
-    let mediaRecorder, chunks = [];
-    $("callBtn").onclick = async () => {
+    // Live call: tap once, mic stays open. Energy-based VAD auto-sends each
+    // utterance to /api/voice, the reply is spoken, then we listen again.
+    // Talking over the assistant stops its audio (barge-in).
+    // ponytail: RMS threshold VAD, swap for @ricky0123/vad-web if noisy rooms misfire.
+    const VAD = { startRms: 0.04, bargeRms: 0.09, bargeMs: 200, silenceMs: 1000, minSpeechMs: 300, maxClipMs: 20000, tickMs: 50 };
+    let call = null;
+    const assistantSpeaking = () => ttsPending > 0 || (audio && !audio.paused && !audio.ended);
+    const clipMime = () => ["audio/webm", "audio/mp4"].find((t) => MediaRecorder.isTypeSupported(t));
+
+    function setCallUi(on) {
       const btn = $("callBtn");
-      if (mediaRecorder && mediaRecorder.state === "recording") {
-        mediaRecorder.stop();
-        return;
-      }
+      btn.classList.toggle("recording", on);
+      btn.innerHTML = icon(on ? "stop" : "mic", 18);
+      btn.setAttribute("aria-label", on ? "End call" : "Start live call");
+      btn.setAttribute("aria-pressed", String(on));
+    }
+
+    function endCall(msg = "") {
+      if (!call) return;
+      clearInterval(call.timer);
+      if (call.rec && call.rec.state === "recording") { call.discard = true; call.rec.stop(); }
+      call.stream.getTracks().forEach((t) => t.stop());
+      call.ctx.close().catch(() => {});
+      ttsGen++; // cancel any TTS still loading
+      if (audio) audio.pause();
+      call = null;
+      setCallUi(false);
+      $("agentStatus").textContent = msg;
+    }
+
+    async function sendClip(blob) {
+      const c = call;
+      c.busy = true;
+      setThinking(true, "Transcribing…");
+      await ensureLoc();
+      const fd = new FormData();
+      fd.append("area_id", current);
+      fd.append("device_id", deviceId());
+      let heard = false;
+      fd.append("audio", blob, "clip." + (blob.type.includes("mp4") ? "mp4" : "webm"));
+      if (myLoc) { fd.append("latitude", myLoc.lat); fd.append("longitude", myLoc.lng); }
+      if (userLang) fd.append("language", userLang);
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        mediaRecorder = new MediaRecorder(stream);
-        chunks = [];
-        mediaRecorder.ondataavailable = (e) => chunks.push(e.data);
-        mediaRecorder.onstop = async () => {
-          stream.getTracks().forEach((t) => t.stop());
-          btn.classList.remove("recording"); btn.innerHTML = icon("mic", 18);
-          const blob = new Blob(chunks, { type: "audio/webm" });
-          await ensureLoc();
-          const fd = new FormData();
-          fd.append("area_id", current);
-          fd.append("device_id", deviceId());
-          fd.append("audio", blob, "clip.webm");
-          if (myLoc) { fd.append("latitude", myLoc.lat); fd.append("longitude", myLoc.lng); }
-          if (userLang) fd.append("language", userLang);
-          fd.append("device_id", deviceId());
-          setThinking(true, "Transcribing…");
-          try {
-            const res = await fetch("/api/voice", { method: "POST", body: fd });
-            const data = await res.json();
-            if (!res.ok) throw new Error((data.error && data.error.message) || JSON.stringify(data));
-            setThinking(false);
-            addMsg("user", "You (voice)", data.transcript || "(no speech detected)");
-            handleAgent(data.response);
-          } catch (e) {
-            setThinking(false);
-            $("agentStatus").innerHTML = `<span class="err">${esc(e.message)}</span>`;
-          }
-        };
-        mediaRecorder.start();
-        btn.classList.add("recording"); btn.innerHTML = icon("stop", 18);
-        $("agentStatus").textContent = "Listening… tap again to stop.";
+        const res = await fetch("/api/voice", { method: "POST", body: fd });
+        const data = await res.json();
+        if (!res.ok) throw new Error((data.error && data.error.message) || JSON.stringify(data));
+        setThinking(false);
+        if (data.transcript) {
+          addMsg("user", "You (voice)", data.transcript);
+          handleAgent(data.response, call === c); // still file/show it, but stay silent if the call ended
+        }
+        heard = !!data.transcript;
       } catch (e) {
+        setThinking(false);
+        if (call === c) $("agentStatus").innerHTML = `<span class="err">${esc(e.message)}</span>`;
+        return c.busy = false;
+      }
+      if (call === c) { c.busy = false; $("agentStatus").textContent = heard ? "Live — listening…" : "Live — didn’t catch that, go ahead…"; }
+    }
+
+    function beginClip(c) {
+      const mimeType = clipMime();
+      const rec = new MediaRecorder(c.stream, mimeType ? { mimeType } : undefined);
+      const parts = [];
+      rec.ondataavailable = (e) => parts.push(e.data);
+      rec.onstop = () => {
+        if (c.discard || !call || c.voicedMs < VAD.minSpeechMs) { c.recording = false; return; }
+        const type = (rec.mimeType || "audio/webm").split(";")[0];
+        c.recording = false;
+        sendClip(new Blob(parts, { type }));
+      };
+      rec.start();
+      c.rec = rec; c.recording = true; c.voicedMs = 0; c.silentMs = 0; c.clipMs = 0;
+    }
+
+    function vadTick() {
+      const c = call;
+      if (!c) return;
+      c.analyser.getFloatTimeDomainData(c.buf);
+      let sum = 0;
+      for (const v of c.buf) sum += v * v;
+      const rms = Math.sqrt(sum / c.buf.length);
+      const speaking = assistantSpeaking();
+      const loud = rms > (speaking ? VAD.bargeRms : VAD.startRms);
+
+      if (!c.recording) {
+        if (c.busy) return;
+        // Over the assistant's voice, require sustained speech (echo guard) before barge-in.
+        c.loudMs = loud ? (c.loudMs || 0) + VAD.tickMs : 0;
+        if (!loud || (speaking && c.loudMs < VAD.bargeMs)) return;
+        if (speaking) { ttsGen++; if (audio) audio.pause(); } // barge-in
+        $("agentStatus").textContent = "Live — hearing you…";
+        beginClip(c);
+      }
+      if (c.rec.state !== "recording") return; // stop() already issued, waiting for onstop
+      c.clipMs += VAD.tickMs;
+      if (loud) { c.voicedMs += VAD.tickMs; c.silentMs = 0; } else { c.silentMs += VAD.tickMs; }
+      if (c.silentMs >= VAD.silenceMs || c.clipMs >= VAD.maxClipMs) c.rec.stop();
+    }
+
+    $("callBtn").onclick = async () => {
+      if (call) return endCall();
+      // Create + resume the AudioContext inside the tap (Safari/iOS user-activation rule).
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      let stream;
+      try {
+        ctx.resume();
+        stream = await navigator.mediaDevices.getUserMedia({
+          audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+        });
+        const analyser = ctx.createAnalyser();
+        analyser.fftSize = 1024;
+        ctx.createMediaStreamSource(stream).connect(analyser);
+        call = { stream, ctx, analyser, buf: new Float32Array(analyser.fftSize), recording: false, busy: false };
+        call.timer = setInterval(vadTick, VAD.tickMs);
+        setCallUi(true);
+        $("agentStatus").textContent = "Live — listening… (headphones work best)";
+      } catch (e) {
+        if (stream) stream.getTracks().forEach((t) => t.stop());
+        ctx.close().catch(() => {});
         $("agentStatus").innerHTML = `<span class="err">Mic error: ${esc(e.message)}</span>`;
       }
     };
+    // Hang up if the page is hidden so the mic never stays open in the background.
+    document.addEventListener("visibilitychange", () => { if (document.hidden) endCall(); });
+    window.addEventListener("pagehide", () => endCall());
 
     // ---- Reports ----
     const REPORT_MESSAGES = {
