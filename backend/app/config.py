@@ -23,7 +23,9 @@ def _clean(value: str | None) -> str | None:
 class Settings:
     # --- Providers ---
     gemini_api_key: str | None = _clean(os.getenv("GEMINI_API_KEY"))
-    gemini_model: str = _clean(os.getenv("GEMINI_MODEL")) or "gemini-2.5-flash"
+    # flash-lite has available free-tier quota and is fast — ideal for the
+    # short voice replies here. Override with GEMINI_MODEL if you have paid quota.
+    gemini_model: str = _clean(os.getenv("GEMINI_MODEL")) or "gemini-flash-lite-latest"
 
     elevenlabs_api_key: str | None = _clean(os.getenv("ELEVENLABS_API_KEY"))
     elevenlabs_tts_voice_id: str = (
@@ -58,10 +60,11 @@ class Settings:
 
     @property
     def gemini_auth_mode(self) -> str:
-        # "api_key"  -> AI Studio key (starts with AIza), sent as x-goog-api-key.
-        # "oauth"    -> OAuth access token (e.g. AQ./ya29.), sent as Bearer.
+        # API keys (both the classic "AIza..." and the newer "AQ..." format) are
+        # sent as x-goog-api-key. Only a genuine OAuth access token ("ya29...")
+        # is sent as Authorization: Bearer.
         key = self.gemini_api_key or ""
-        return "api_key" if key.startswith("AIza") else "oauth"
+        return "oauth" if key.startswith("ya29.") else "api_key"
 
     @property
     def elevenlabs_enabled(self) -> bool:

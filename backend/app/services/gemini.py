@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 import re
+import time
 
 import httpx
 
@@ -56,22 +57,48 @@ def _generate(
     }
     if system:
         body["systemInstruction"] = {"parts": [{"text": system}]}
-    if json_mode:
-        body["generationConfig"]["responseMimeType"] = "application/json"
-    try:
-        headers = {**_auth_headers(), "Content-Type": "application/json"}
-        with httpx.Client(timeout=30.0) as client:
-            r = client.post(url, headers=headers, json=body)
+    # NOTE: we deliberately do NOT set responseMimeType=application/json. That
+    # structured-output serving path has been returning 503s; instead the
+    # prompts ask for JSON and _parse_json tolerantly extracts it.
+    headers = {**_auth_headers(), "Content-Type": "application/json"}
+    # Retry transient 503/429 (demand spikes) with a short backoff.
+    for attempt in range(2):
+        try:
+            with httpx.Client(timeout=20.0) as client:
+                r = client.post(url, headers=headers, json=body)
+            if r.status_code in (429, 503):
+                _LAST_ERROR = f"{r.status_code}: {r.text[:160]}"
+                time.sleep(0.6)
+                continue
             r.raise_for_status()
-            data = r.json()
-        parts = data["candidates"][0]["content"]["parts"]
-        _LAST_ERROR = None
-        return "".join(p.get("text", "") for p in parts).strip() or None
-    except httpx.HTTPStatusError as e:
-        _LAST_ERROR = f"{e.response.status_code}: {e.response.text[:200]}"
+            parts = r.json()["candidates"][0]["content"]["parts"]
+            _LAST_ERROR = None
+            return "".join(p.get("text", "") for p in parts).strip() or None
+        except httpx.HTTPStatusError as e:
+            _LAST_ERROR = f"{e.response.status_code}: {e.response.text[:160]}"
+            return None
+        except Exception as e:  # network, parse, shape
+            _LAST_ERROR = str(e)[:160]
+            return None
+    return None  # exhausted retries on 503/429
+
+
+def _parse_json(text: str) -> dict | None:
+    """Tolerant JSON parse: handles plain JSON or ```json fenced blocks."""
+    if not text:
         return None
-    except Exception as e:  # network, parse, shape
-        _LAST_ERROR = str(e)[:200]
+    t = text.strip()
+    if t.startswith("```"):
+        t = re.sub(r"^```(?:json)?\s*|\s*```$", "", t, flags=re.IGNORECASE).strip()
+    try:
+        return json.loads(t)
+    except json.JSONDecodeError:
+        m = re.search(r"\{.*\}", t, flags=re.DOTALL)
+        if m:
+            try:
+                return json.loads(m.group(0))
+            except json.JSONDecodeError:
+                return None
         return None
 
 ALLOWED_TOPICS = {"status", "shelter", "route", "roads_to_avoid", "next_update", "unsupported"}
@@ -184,11 +211,8 @@ def converse(question: str, context_text: str, language_hint: str | None = None)
     )
     text = _generate(prompt, system=SAFETY_PROMPT, temperature=0.3,
                      max_tokens=400, json_mode=True)
-    if not text:
-        return None
-    try:
-        data = json.loads(text)
-    except json.JSONDecodeError:
+    data = _parse_json(text) if text else None
+    if data is None:
         return None
     event = data.get("event_type", "none")
     if event not in REPORT_KINDS:
@@ -249,12 +273,10 @@ def classify(question: str) -> tuple[str, str]:
         f"{CLASSIFY_INSTRUCTION}\n\nResident question: {question}",
         system=SAFETY_PROMPT, temperature=0.0, json_mode=True,
     )
-    if not text:
+    data = _parse_json(text) if text else None
+    if data is None:
         return classify_keyword(question), "deterministic"
-    try:
-        topic = json.loads(text).get("topic", "unsupported")
-    except json.JSONDecodeError:
-        return classify_keyword(question), "deterministic"
+    topic = data.get("topic", "unsupported")
     if topic not in ALLOWED_TOPICS:
         topic = "unsupported"
     return topic, "gemini_grounded"
