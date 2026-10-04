@@ -51,10 +51,14 @@ export function createMap(element, data, { config, onVillage, onNotice, onCell }
     const layer = (id, type, source, paint, layout) => map.addLayer({ id, type, source, paint, ...(layout ? { layout } : {}) });
     layer('district-fill', 'fill', 'district', { 'fill-color': '#64748b', 'fill-opacity': 0.45 });
     layer('wards-fill', 'fill', 'wards', { 'fill-color': '#94a3b8', 'fill-opacity': 0.5 });
-    const riskColor = ['match', ['get', 'risk_level'], 'Extreme', '#dc2626', 'High', '#f97316', 'Moderate', '#facc15', 'Low', '#22c55e', '#94a3b8'];
-    layer('risk-fill', 'fill', 'risk-zones', { 'fill-color': riskColor, 'fill-opacity': 0.68 });
+    const levelColor = level => ['match', level, 'Extreme', '#dc2626', 'High', '#f97316', 'Moderate', '#facc15', 'Low', '#22c55e', '#94a3b8'];
+    // Outside the hazard-proximity analysis a ward is colored by its own sensor reading (lighter fill);
+    // it stays gray only when the ward has no reading.
+    const sensorOnly = ['==', ['get', 'risk_level'], 'Unknown'];
+    const riskColor = ['case', sensorOnly, levelColor(['get', 'sensor_risk_level']), levelColor(['get', 'risk_level'])];
+    layer('risk-fill', 'fill', 'risk-zones', { 'fill-color': riskColor, 'fill-opacity': ['case', sensorOnly, 0.4, 0.68] });
     layer('risk-outline-halo', 'line', 'risk-zones', { 'line-color': '#0f172a', 'line-width': 3 });
-    layer('risk-outline', 'line', 'risk-zones', { 'line-color': riskColor, 'line-width': 1.5 });
+    layer('risk-outline', 'line', 'risk-zones', { 'line-color': riskColor, 'line-width': 1.5, 'line-opacity': ['case', sensorOnly, 0.5, 1] });
     layer('hazards-fill', 'fill', 'hazards', { 'fill-color': '#ef4444', 'fill-opacity': 0.85 });
     layer('wards-halo', 'line', 'wards', { 'line-color': '#142b38', 'line-width': 6 });
     layer('wards-line', 'line', 'wards', { 'line-color': '#fff', 'line-width': 3 });
@@ -80,7 +84,7 @@ export function createMap(element, data, { config, onVillage, onNotice, onCell }
     });
     map.on('click', 'risk-fill', event => {
       const p = event.features?.[0]?.properties;
-      if (p) onCell(`${p.ward_name}: ${p.risk_level} risk · ${p.provenance}. ${p.observed_at ? `Rain ${p.rainfall_mm_24h} mm/24h · river/warning ${p.river_level_ratio} · soil ${p.soil_moisture_pct}% · observed ${p.observed_at}` : 'No sensor assessment available.'}`);
+      if (p) onCell(`${p.ward_name}: ${p.risk_level === 'Unknown' && p.sensor_risk_level ? `${p.sensor_risk_level} risk (ward sensor reading only, outside the hazard analysis)` : `${p.risk_level} risk`} · ${p.provenance}. ${p.observed_at ? `Rain ${p.rainfall_mm_24h} mm/24h · river/warning ${p.river_level_ratio} · soil ${p.soil_moisture_pct}% · observed ${p.observed_at}` : 'No sensor assessment available.'}`);
     });
     map.on('mouseenter', 'village-points', () => { map.getCanvas().style.cursor = 'pointer'; });
     map.on('mouseleave', 'village-points', () => { map.getCanvas().style.cursor = ''; });
