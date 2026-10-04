@@ -1,3 +1,5 @@
+import { roadLabel } from './road-status.js';
+
 const element = id => document.getElementById(`gov-${id}`);
 let areas = [], current = '', catalog = null, generation = 0, timer, publishing = false;
 
@@ -8,6 +10,48 @@ async function api(path, options = {}) {
   });
   if (!response.ok) throw new Error(`Request failed (${response.status})`);
   return response.json();
+}
+
+// Road closures: statuses are shared through the backend; app.js/map-view.js consume them via window events.
+let roadList = [], pickedRoad = null, roadsOnline = false, lastRoads = null;
+
+function setRoads(connected) {
+  roadsOnline = connected;
+  const serialized = JSON.stringify([roadList, connected]);
+  if (serialized !== lastRoads) { // refresh() polls every 15 s; only announce actual changes
+    lastRoads = serialized;
+    window.dispatchEvent(new CustomEvent('road-status', { detail: { roads: roadList, connected } }));
+  }
+  const enabled = connected && !!pickedRoad;
+  element('road-note').disabled = !enabled;
+  for (const button of document.querySelectorAll('[data-road-status]')) button.disabled = !enabled;
+}
+
+window.addEventListener('road-pick', ({ detail }) => {
+  pickedRoad = detail;
+  const current = roadList.find(road => road.road_id === detail.id);
+  element('road-name').textContent = `Selected: ${roadLabel(detail)} · currently ${current?.status || 'open'}`;
+  element('road-note').value = current?.note || '';
+  element('road-status').textContent = '';
+  setRoads(roadsOnline);
+});
+
+for (const button of document.querySelectorAll('[data-road-status]')) {
+  button.addEventListener('click', async () => {
+    if (!pickedRoad || !roadsOnline) return;
+    const { id } = pickedRoad, status = button.dataset.roadStatus, note = element('road-note').value.trim();
+    element('road-status').textContent = `Setting road to ${status}…`;
+    try {
+      await api(`/api/government/roads/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify({ status, ...(note && { note }) }) });
+      roadList = roadList.filter(road => road.road_id !== id);
+      if (status !== 'open') roadList.push({ road_id: id, status, note: note || null });
+      setRoads(true);
+      element('road-name').textContent = `Selected: ${roadLabel(pickedRoad)} · currently ${status}`;
+      element('road-status').textContent = `Road set to ${status}. Route search now ${status === 'open' ? 'may use' : 'avoids'} it.`;
+    } catch (error) {
+      element('road-status').textContent = `Road status was not changed: ${error.message}.`;
+    }
+  });
 }
 
 function options(id, entries) {
@@ -62,6 +106,7 @@ function unavailable(error) {
   clearTimeout(timer);
   element('fields').disabled = true;
   element('refresh-model').disabled = true;
+  setRoads(false);
   element('status').textContent = `Government API unavailable: ${error.message}. Reconnect to retry. Local Rasuwa routing remains available.`;
   element('connect').textContent = 'Reconnect government API';
 }
@@ -70,12 +115,15 @@ async function refresh() {
   const requestGeneration = generation;
   const area = current;
   try {
-    const [dashboard, reports, instruction] = await Promise.all([
+    const [dashboard, reports, instruction, roads] = await Promise.all([
       api('/api/government/dashboard'),
       api(`/api/government/reports?area_id=${encodeURIComponent(area)}`),
-      api(`/api/government/instructions/${encodeURIComponent(area)}`)
+      api(`/api/government/instructions/${encodeURIComponent(area)}`),
+      api('/api/public/roads/status').catch(() => null) // road layer is optional; keep last known statuses
     ]);
     if (requestGeneration !== generation) return;
+    if (Array.isArray(roads?.roads)) roadList = roads.roads;
+    setRoads(true);
     areas = dashboard.areas;
     renderAreas();
     items('events', dashboard.events, event => event.kind, event => `${event.summary} · ${event.created_at}`, 'No operational events yet.');

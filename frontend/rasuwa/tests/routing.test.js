@@ -29,6 +29,14 @@ test('finds shortest mapped path and removes destinations beyond the official li
   assert.equal(recommend(fixture, { origin: 'village', mode: 'walking', maxDistance: 249 }).candidates.length, 0);
 });
 
+test('a GPS point on a closed road snaps to the nearest node on an open road', async () => {
+  const { recommend } = await load();
+  const data = structuredClone(fixture);
+  data.graphs.walking.edges.a = [['c', 500, 'closed-road']];
+  const result = recommend(data, { point: [85, 28], mode: 'walking', maxDistance: 500, blocked: ['closed-road'] });
+  assert.equal(result.candidates[0].route.distance_m, 150);
+});
+
 test('vehicle routing respects directed edges and never invents a connector', async () => {
   const { recommend } = await load();
   assert.equal(recommend(fixture, { origin: 'village', mode: 'vehicle', maxDistance: 1000 }).candidates.length, 0);
@@ -89,4 +97,28 @@ test('all 28 village origins preserve reference paths except sensor-excluded des
       }
     }
   }
+});
+
+test('a blocked road is never routed over; the search takes the open alternative or reports none', async () => {
+  const { recommend } = await load();
+  const open = recommend(fixture, { origin: 'village', mode: 'walking', maxDistance: 1000 });
+  assert.equal(open.candidates[0].route.distance_m, 250);
+  assert.deepEqual(open.candidates[0].route.road_ids, ['path']);
+  const detour = recommend(fixture, { origin: 'village', mode: 'walking', maxDistance: 1000, blocked: ['path'] });
+  assert.equal(detour.candidates[0].route.distance_m, 500);
+  assert.deepEqual(detour.candidates[0].route.road_ids, ['long-road']);
+  const none = recommend(fixture, { origin: 'village', mode: 'walking', maxDistance: 1000, blocked: ['path', 'long-road'] });
+  assert.equal(none.candidates.length, 0);
+  assert.match(none.exclusions.grass, /No admissible/);
+});
+
+test('a GPS point snaps to the nearest routable node and rejects points far from any road', async () => {
+  const { recommend } = await load();
+  const result = recommend(fixture, { point: [85.00005, 28], mode: 'walking', maxDistance: 1000 });
+  assert.equal(result.candidates[0].route.distance_m, 250);
+  assert.match(result.candidates[0].route.route_id, /:gps:/);
+  assert.throws(() => recommend(fixture, { point: [85.5, 28], mode: 'walking', maxDistance: 1000 }), /No mapped road/);
+  assert.throws(() => recommend(fixture, { point: [NaN, 28], mode: 'walking', maxDistance: 1000 }), /location/i);
+  // a dead-end node (no outgoing edges) is never a start point
+  assert.throws(() => recommend(fixture, { point: [85.00199, 28], mode: 'walking', maxDistance: 1000, snapMetres: 5 }), /No mapped road/);
 });

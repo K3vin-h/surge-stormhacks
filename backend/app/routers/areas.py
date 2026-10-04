@@ -15,7 +15,8 @@ router = APIRouter(prefix="/api")
 
 @router.get("/areas", response_model=AreasResponse)
 def list_areas() -> AreasResponse:
-    summaries = [models.build_summary(aid) for aid in AREA_IDS]
+    summaries = [models.build_summary(aid) for aid in AREA_IDS
+                 if not (fx.get_area(aid) or {}).get("placeholder")]
     return AreasResponse(areas=summaries, updated_at=now_utc())
 
 

@@ -3,12 +3,13 @@ from __future__ import annotations
 
 from ..config import REPO_ROOT
 from ..db import snowflake_client as sf
-from . import cache
+from . import cache, road_status
 
 _TABLES = (
     ("REPORTS", "reports"),
     ("INSTRUCTIONS", "instructions"),
     ("EVENTS", "events"),
+    ("ROAD_STATUS", "roads"),
 )
 CLEARED_MARKER = REPO_ROOT / "backend" / ".demo-cleared"
 
@@ -21,5 +22,6 @@ def clear_slate() -> dict[str, int]:
         counts[key] = int(next(iter(row.values()))) if row else 0
         sf.execute(f"DELETE FROM {table}")
     cache.hydrate({})
+    road_status.invalidate()
     CLEARED_MARKER.write_text("cleared\n", encoding="utf-8")
     return counts

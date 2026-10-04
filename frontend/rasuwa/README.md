@@ -29,6 +29,12 @@ For any static deployment, publish `frontend/` with the generated `rasuwa/vendor
 
 Limits have no automatic default. Distances are along mapped graph edges, excluding unverified approaches from markers to the road/path. Selecting a candidate only changes the current page. It resets on reload and does not publish an evacuation instruction.
 
+## Road closures
+
+After **Connect government API**, click any mapped road on the map to select it (highlighted yellow), then use the **Road closures** panel to set it **Open**, **Closed**, or **Flooded**, with an optional note (up to 200 characters). This does `PUT /api/government/roads/{road_id}` using the OSM way id. Statuses are stored by the backend and shared: `GET /api/public/roads/status` returns the non-open roads and is reloaded on the existing 15-second government refresh, so every client that connects sees the same closures.
+
+Closed roads draw as long red dashes and flooded roads as short blue dashes. Route search passes all closed and flooded road ids as `blocked` to `recommend()`, so no candidate route crosses them. When statuses change, the search re-runs; if the previously selected destination becomes unreachable, the status text says so. Before connecting, no `/api/` request is made and nothing is blocked. If the status endpoint fails, the last known statuses stay in effect. Picking roads is mouse/touch only on the map; the status buttons and note field are keyboard-operable.
+
 ## Included geography and scenario
 
 The bundled source contains one Rasuwa district outline, six Gosaikunda ward boundaries, 28 mapped origin/settlement points, 12 facilities, 1,008 transport ways, and five open-ground polygons. Some origin labels are mapped research stations or unnamed OSM points rather than verified villages. Features retain OpenStreetMap IDs, tags, and source links; the snapshot's source manifest is included in both JSON files.
@@ -49,7 +55,8 @@ Permission, capacity, structural condition/ground usability, landslide exposure,
 | `map-view.js` | MapLibre geographic layers, village clicks, route display and camera controls |
 | `routing.js` | Browser-side Dijkstra search, candidate ranking, mode/distance validation |
 | `config.js` | Public imagery URL, attribution, and optional label glyph source |
-| `government.js` | Ranked areas, reports, events, model refresh and directive publishing through the existing API |
+| `government.js` | Ranked areas, reports, events, model refresh and directive publishing through the existing API; road open/closed/flooded updates |
+| `road-status.js` | Pure helpers: blocked road ids, road-status GeoJSON, road labels |
 | `data/sensors.json` | Editable simulated per-ward sensor readings used during preparation |
 | `data/source.json` | Frozen, provenance-bearing OSM geography and synthetic scenario |
 | `data/prepared.json` | Risk overlays, filtered graphs, origins and candidate access-node metadata |

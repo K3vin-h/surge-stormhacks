@@ -1,7 +1,7 @@
 """Resident-facing routes: status, alerts, map, and report submit/read."""
 from __future__ import annotations
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Query, Request, Response
 
 from ..errors import not_found
 from ..fixtures import areas as fx
@@ -11,8 +11,9 @@ from ..schemas.instructions import (
     PublicMapResponse,
     PublicStatusResponse,
 )
+from ..schemas.roads import RoadStatusResponse
 from ..schemas.reports import ReportsResponse, SubmitReportRequest, SubmitReportResponse
-from ..services import answers, cache, instructions, models, reports as reports_svc
+from ..services import answers, cache, instructions, models, reports as reports_svc, road_status
 from ..util import decode_cursor, next_cursor, now_utc
 
 router = APIRouter(prefix="/api/public")
@@ -23,11 +24,30 @@ def _require_area(area_id: str) -> None:
         raise not_found(f"Unknown area '{area_id}'.")
 
 
+@router.get("/roads/status", response_model=RoadStatusResponse)  # ponytail: ETag is the version; no Cache-Control
+def roads_status(request: Request, response: Response) -> RoadStatusResponse | Response:
+    data = road_status.list_roads()
+    etag = f'"{data.version}"'
+    if request.headers.get("if-none-match") == etag:
+        return Response(status_code=304, headers={"ETag": etag})
+    response.headers["ETag"] = etag
+    return data
+
+
 @router.get("/status/{area_id}", response_model=PublicStatusResponse)
 def status(area_id: str) -> PublicStatusResponse:
     _require_area(area_id)
     summary = models.build_summary(area_id)
     inst = cache.get_current(area_id)
+    if fx.get_area(area_id).get("placeholder"):
+        # summary is a free-form dict, so "unknown" needs no schema change.
+        return PublicStatusResponse(
+            area_id=area_id,
+            name=summary.name,
+            summary={"risk_level": "unknown", "risk_score": None, "priority_level": "unknown"},
+            instruction=inst,
+            freshness=cache.freshness(area_id),
+        )
     return PublicStatusResponse(
         area_id=area_id,
         name=summary.name,
@@ -112,7 +132,7 @@ def area_map(area_id: str) -> PublicMapResponse:
     return PublicMapResponse(
         area_id=area_id,
         geometry=fx.geometry_for(area_id),
-        risk_level=summary.risk.risk_level.value,
+        risk_level="unknown" if a.get("placeholder") else summary.risk.risk_level.value,
         current_instruction_id=inst.publication_id if inst else None,
         shelter=shelter,
         approved_route=route,

@@ -134,6 +134,21 @@
     .ask b { display: block; font-size: 15px; }
     .ask small { opacity: .75; }
 
+    /* Rasuwa client-side routing panel */
+    .rz { position: absolute; z-index: 600; left: 12px; right: 12px; top: 84px; display: grid; gap: 8px; pointer-events: none; }
+    .rz > * { pointer-events: auto; }
+    .rz-banner { display: flex; gap: 8px; align-items: flex-start; background: var(--red); color: #fff; border-radius: 12px; padding: 10px 12px; font-weight: 600; box-shadow: var(--shadow); }
+    .rz-banner[hidden], .rz[hidden] { display: none; }
+    .rz-banner span { flex: 1; }
+    .rz-banner button { background: none; border: 0; color: #fff; font-size: 20px; line-height: 1; cursor: pointer; }
+    .rz-card { background: var(--surface); border-radius: 12px; padding: 10px 12px; box-shadow: var(--shadow); font-size: 13.5px; }
+    .rz-row { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+    .rz-row button { border: 1px solid var(--line); background: var(--surface); color: var(--ink); border-radius: 999px; padding: 5px 12px; font: inherit; cursor: pointer; }
+    .rz-row button[hidden] { display: none; }
+    .rz-row button[aria-pressed="true"] { background: var(--ink); color: var(--surface); }
+    .rz button:focus-visible { outline: 2px solid var(--brand-sage); outline-offset: 2px; }
+    .rz small { display: block; margin-top: 8px; color: var(--muted); font-size: 11.5px; }
+
     /* Map tab */
     #tab-map { padding: 0; overflow: hidden; }
     #map { position: absolute; inset: 0; z-index: 0; }
@@ -254,6 +269,18 @@
         <section class="tab" id="tab-map" hidden>
           <div id="map"></div>
           <div class="map-toggles" id="legendSlot"></div>
+          <div class="rz" id="rzPanel" hidden>
+            <div class="rz-banner" id="rzBanner" role="alert" hidden><span id="rzBannerText"></span><button type="button" id="rzBannerX" aria-label="Dismiss">&times;</button></div>
+            <div class="rz-card">
+              <div id="rzStatus" role="status" aria-live="polite"></div>
+              <div class="rz-row">
+                <button type="button" data-rz-mode="walking" aria-pressed="true">Walking</button>
+                <button type="button" data-rz-mode="vehicle" aria-pressed="false">Vehicle</button>
+                <button type="button" id="rzRetry" hidden>Retry</button>
+              </div>
+              <small>Simulated data. Routes are not a guarantee of safety; follow local authorities.</small>
+            </div>
+          </div>
           <button class="locate" id="locateBtn" aria-label="Show my location"><span data-icon="locate"></span></button>
           <div class="sheet collapsed" id="sheet">
             <button class="grab" id="grab" aria-label="Expand details"></button>
@@ -303,7 +330,7 @@
       </nav>
   </div>
 
-  <script src="common.js?v=brand5"></script>
+  <script src="common.js?v=brand6"></script>
   <script>
     const $ = (id) => document.getElementById(id);
     let current = "sunsari";
@@ -383,6 +410,7 @@
       mapSig = "";
       needsFit = true;
       map.setView(AREA_CENTERS[current], 12);
+      if (current === "rasuwa") rzEnter(); else rzLeave();
       refresh();
       if (tab === "alerts") loadAlerts();
     }
@@ -430,7 +458,8 @@
       const card = $("instCard");
       const inst = status.instruction;
       const risk = riskInfo(status.summary.risk_level);
-      $("riskMeta").innerHTML = pill(`${risk.label} · ${Math.round(status.summary.risk_score * 100)}/100`, risk.tone);
+      const scored = typeof status.summary.risk_score === "number" && risk.label !== "Risk data unavailable";
+      $("riskMeta").innerHTML = pill(scored ? `${risk.label} · ${Math.round(status.summary.risk_score * 100)}/100` : risk.label, risk.tone);
       $("nextMeta").textContent = inst && inst.next_update_at ? fmtClock(inst.next_update_at) : "when issued";
       if (!inst) {
         card.className = "inst none";
@@ -463,6 +492,189 @@
         b.onclick = () => playTts({ kind: "instruction", instruction_id: b.dataset.inst }, b);
       });
     }
+
+    // ---- Rasuwa: client-side routing (loaded only while the Rasuwa area is selected) ----
+    const RZ_NO_ROUTE = "No safe mapped route found. Contact your local emergency authority.";
+    const RZ = { on: false, epoch: 0, lib: null, data: null, feats: null, mode: "walking", roads: [], roadsStale: false, roadsLoaded: false, roadsAt: 0, pollSeq: 0, routeKey: "",
+      point: null, planPoint: null, plan: null, geoErr: null, watch: null, timer: null, layer: null, roadLayer: null, notice: "" };
+    const rzDist = (m) => (m < 1000 ? `${Math.round(m)} m` : `${(m / 1000).toFixed(1)} km`);
+    const rzName = (id) => (RZ.feats && RZ.feats.get(id) && RZ.feats.get(id).properties.name) || id;
+
+    const RZ_NO_ROADS = "Road closure information unavailable. This route may use closed or flooded roads.";
+    const rzAge = (at) => { const m = Math.max(0, Math.round((Date.now() - at) / 60000)); return m < 1 ? "under a minute" : m < 60 ? `${m} min` : `${Math.round(m / 60)} h`; };
+    function rzStored() {
+      try { const v = JSON.parse(localStorage.getItem("rz.roads")); return v && Array.isArray(v.roads) && Number.isFinite(v.at) ? v : null; } catch (_) { return null; }
+    }
+    function rzStore(roads, at) { try { localStorage.setItem("rz.roads", JSON.stringify({ at, roads })); } catch (_) {} }
+    // Identical text is never re-shown after the resident dismissed it (RZ.notice stays set; only "" resets).
+    function rzNotice(text) {
+      if (text === RZ.notice) return;
+      RZ.notice = text;
+      $("rzBannerText").textContent = text;
+      $("rzBanner").hidden = !text;
+    }
+    function rzRoadsBanner() {
+      if (!RZ.roadsLoaded && RZ.roadsStale) rzNotice(RZ_NO_ROADS);
+      else if (RZ.notice === RZ_NO_ROADS) rzNotice("");
+    }
+    function rzStatus(text, retry) {
+      $("rzStatus").textContent = text;
+      $("rzRetry").hidden = !retry;
+    }
+
+    function rzEnter() {
+      if (RZ.on) return;
+      RZ.on = true;
+      const epoch = ++RZ.epoch;
+      RZ.layer = L.layerGroup().addTo(map);
+      RZ.roadLayer = L.layerGroup().addTo(map);
+      $("rzPanel").hidden = false;
+      const saved = RZ.roadsLoaded ? null : rzStored();
+      if (saved) { RZ.roads = saved.roads; RZ.roadsAt = saved.at; RZ.roadsLoaded = true; }
+      RZ.timer = setInterval(() => { if (!document.hidden) rzPollRoads(); }, 15000);
+      rzLoad(epoch);
+      rzPollRoads();
+    }
+    function rzLeave() {
+      if (!RZ.on) return;
+      RZ.on = false;
+      RZ.epoch++;
+      clearInterval(RZ.timer);
+      if (RZ.watch != null) navigator.geolocation.clearWatch(RZ.watch);
+      Object.assign(RZ, { timer: null, watch: null, plan: null, planPoint: null, point: null, geoErr: null, roadsStale: false, routeKey: "" });
+      rzNotice("");
+      map.removeLayer(RZ.layer);
+      map.removeLayer(RZ.roadLayer);
+      $("rzPanel").hidden = true;
+    }
+
+    async function rzLoad(epoch) {
+      rzStatus("Loading Rasuwa map data (about 1.5 MB)…", false);
+      let loaded = false;
+      try {
+        const [lib, data] = await Promise.all([
+          RZ.lib || import("/rasuwa/resident-route.js"),
+          RZ.data || fetch("/rasuwa/data/prepared.json").then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); }),
+        ]);
+        if (epoch !== RZ.epoch) return;
+        RZ.lib = lib; RZ.data = data;
+        loaded = true;
+        RZ.feats = new Map(data.map.roads.features.map((f) => [f.id, f]));
+        rzDrawRoads();
+        rzStartWatch();
+        rzCompute();
+      } catch (_) {
+        if (epoch === RZ.epoch) rzStatus(loaded ? "Rasuwa routing could not start. Contact your local emergency authority." : "Could not load Rasuwa map data. Check your connection.", !loaded);
+      }
+    }
+
+    function rzStartWatch() {
+      if (RZ.watch != null) return;
+      if (!navigator.geolocation) { RZ.geoErr = "unsupported"; return rzCompute(); }
+      RZ.geoErr = null;
+      RZ.watch = navigator.geolocation.watchPosition((p) => {
+        RZ.geoErr = null;
+        myLoc = { lat: p.coords.latitude, lng: p.coords.longitude };
+        const pt = [myLoc.lng, myLoc.lat];
+        const move = RZ.lib.shouldRecompute(RZ.planPoint, pt);
+        RZ.point = pt;
+        if (move) rzCompute();
+        if (mapData) drawMap();
+      }, (e) => {
+        RZ.geoErr = e.code === 1 ? "denied" : "unavailable";
+        if (!RZ.point) rzCompute();
+      }, { enableHighAccuracy: true, maximumAge: 10000, timeout: 20000 });
+    }
+
+    function rzCompute() {
+      if (!RZ.on) return;
+      rzRoadsBanner();
+      if (!RZ.lib) return;
+      try {
+        rzComputeRoute();
+      } catch (e) {
+        console.error(e);
+        rzStatus("Could not update your route. Contact your local emergency authority if this continues.", false);
+      }
+    }
+
+    function rzComputeRoute() {
+      const plan = RZ.lib.planRoute(RZ.data, { point: RZ.point, mode: RZ.mode, blocked: RZ.roads.map((r) => r.road_id), previous: RZ.plan });
+      RZ.plan = plan;
+      RZ.planPoint = RZ.point;
+      RZ.layer.clearLayers();
+      if (plan.changedBecause.length) {
+        const names = plan.changedBecause.map((id) => {
+          const r = RZ.roads.find((x) => x.road_id === id);
+          return `${rzName(id)} is now ${r ? r.status : "closed"}`;
+        }).join("; ");
+        rzNotice(`Route changed: ${names}. ${plan.route ? "New route to " + plan.destination.name + "." : RZ_NO_ROUTE}`);
+        toast("Route changed because of a road closure.", { error: true });
+      } else if (plan.status === "no_route" && RZ.roadsLoaded) rzNotice(RZ_NO_ROUTE);
+      else if (RZ.notice === RZ_NO_ROUTE && plan.status !== "no_route") rzNotice("");
+      if (plan.status === "ok") {
+        const line = drawRoute(RZ.layer, plan.route.geometry, `<b>${esc(plan.destination.name)}</b><br>${esc(rzDist(plan.route.distance_m))}`);
+        const c = plan.destination.location.coordinates;
+        L.marker([c[1], c[0]], { icon: pinIcon("shelter", 34) }).bindPopup(`<b>${esc(plan.destination.name)}</b><br>Nearest reachable shelter`).addTo(RZ.layer);
+        // A reroute to the same shelter keeps route_id but changes road_ids, so key on both.
+        const key = `${plan.route.route_id}|${(plan.route.road_ids || []).join(",")}`;
+        if (key !== RZ.routeKey && line) {
+          map.fitBounds(line.getBounds(), { paddingTopLeft: [40, 190], paddingBottomRight: [40, 190], maxZoom: 15 });
+          needsFit = false; // setArea's pending area fit must not overwrite this
+        }
+        RZ.routeKey = key;
+        const stale = RZ.roadsStale && RZ.roadsLoaded ? ` · closure updates unavailable, last known ${rzAge(RZ.roadsAt)} ago` : "";
+        rzStatus(`${plan.destination.name} · ${rzDist(plan.route.distance_m)} ${RZ.mode === "walking" ? "on foot" : "by vehicle"}${stale}`, false);
+      } else if (plan.status === "no_route") rzStatus(RZ_NO_ROUTE, false);
+      else if (plan.status === "too_far") rzStatus("You are not near any mapped road in Rasuwa, so no route can be computed. Contact your local emergency authority.", false);
+      else rzStatus(RZ.geoErr ? "Location unavailable. Allow location access to get a route." : "Finding your location…", false);
+    }
+
+    function rzDrawRoads() {
+      RZ.roadLayer.clearLayers();
+      if (!RZ.feats) return;
+      RZ.roads.forEach((r) => {
+        const f = RZ.feats.get(r.road_id);
+        if (!f) return;
+        const closed = r.status === "closed";
+        L.polyline(f.geometry.coordinates.map((c) => [c[1], c[0]]), closed
+          ? { color: "#c0392b", weight: 6, opacity: 0.95 }
+          : { color: "#2563eb", weight: 6, opacity: 0.95, dashArray: "8 8" })
+          .bindPopup(`<b>${esc(rzName(r.road_id))}</b><br>${closed ? "Closed — do not use" : "Flooded — avoid"}${r.note ? "<br>" + esc(r.note) : ""}`)
+          .addTo(RZ.roadLayer);
+      });
+    }
+
+    async function rzPollRoads() {
+      const epoch = RZ.epoch, seq = ++RZ.pollSeq; // an older response must not overwrite a newer one
+      try {
+        const res = await api("/api/public/roads/status");
+        if (epoch !== RZ.epoch || seq !== RZ.pollSeq) return;
+        if (!Array.isArray(res && res.roads)) throw new Error("malformed road status"); // never wipe closures on a bad body
+        const roads = res.roads;
+        const sig = (rs) => JSON.stringify(rs.map((r) => [r.road_id, r.status]).sort());
+        const changed = sig(roads) !== sig(RZ.roads) || RZ.roadsStale || !RZ.roadsLoaded;
+        RZ.roads = roads; RZ.roadsStale = false; RZ.roadsLoaded = true; RZ.roadsAt = Date.now();
+        rzStore(roads, RZ.roadsAt);
+        if (changed) { rzDrawRoads(); rzCompute(); }
+      } catch (_) {
+        if (epoch !== RZ.epoch || seq !== RZ.pollSeq) return;
+        RZ.roadsStale = true; // keep last known closures
+        rzCompute();
+      }
+    }
+
+    $("rzRetry").onclick = () => rzLoad(RZ.epoch);
+    $("rzBannerX").onclick = () => { $("rzBanner").hidden = true; };
+    document.querySelectorAll("[data-rz-mode]").forEach((b) => {
+      b.onclick = () => {
+        RZ.mode = b.dataset.rzMode;
+        document.querySelectorAll("[data-rz-mode]").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+        RZ.plan = null; // a mode switch is not a closure reroute
+        rzCompute();
+      };
+    });
+    document.addEventListener("visibilitychange", () => { if (!document.hidden && RZ.on) rzPollRoads(); });
 
     // ---- Map ----
     function fitMap() {
@@ -507,7 +719,7 @@
       } else {
         const risk = riskInfo(mapData.risk_level);
         head = `<div class="sh-route"><span class="sh-ic tone-${risk.tone}">${icon("map", 22)}</span>
-          <span><div class="eyebrow">No active evacuation route</div><b>${esc(risk.label)} flood risk</b>
+          <span><div class="eyebrow">No active evacuation route</div><b>${esc(mapData.risk_level === "unknown" || !mapData.risk_level ? "Flood risk data unavailable for this area" : risk.label + " flood risk")}</b>
           <span class="muted small">Follow the current official instruction.</span></span></div>`;
       }
       if (mapData.shelter) items.push(["shelter", mapData.shelter.name, "Approved shelter"]);

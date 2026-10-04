@@ -1,12 +1,13 @@
 // Shared helpers for the SURGE government workspace and resident app.
 // Served same-origin by FastAPI, so the API base is just "".
 
-const AREAS = ["sunsari", "saptari", "bardiya", "kathmandu_valley"];
+const AREAS = ["sunsari", "saptari", "bardiya", "kathmandu_valley", "rasuwa"];
 const AREA_LABELS = {
   sunsari: "Sunsari",
   saptari: "Saptari",
   bardiya: "Bardiya",
   kathmandu_valley: "Kathmandu Valley",
+  rasuwa: "Rasuwa",
 };
 
 // Rough area centers [lat, lng] for map defaults.
@@ -15,6 +16,7 @@ const AREA_CENTERS = {
   saptari: [26.616, 86.998],
   bardiya: [28.3, 81.433],
   kathmandu_valley: [27.709, 85.324],
+  rasuwa: [28.20, 85.30], // prepared.json road nodes centre ~[28.185, 85.351]
 };
 
 let sessionDeviceId;
@@ -163,7 +165,7 @@ const VERIFICATION = {
   false_report: "False report",
 };
 
-function riskInfo(level) { return RISK[level] || { label: level || "Unknown", tone: "neutral" }; }
+function riskInfo(level) { return RISK[level] || (!level || level === "unknown" ? { label: "Risk data unavailable", tone: "neutral" } : null) || { label: level || "Unknown", tone: "neutral" }; }
 function priorityInfo(level) { return PRIORITY[level] || { label: level || "—", note: "", tone: "neutral" }; }
 function instructionInfo(type) { return INSTRUCTION[type] || { label: type || "—", icon: "alert", tone: "neutral" }; }
 function reportInfo(kind) { return REPORT_KIND[kind] || { label: kind, icon: "alert", tone: "neutral" }; }

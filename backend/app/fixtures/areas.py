@@ -273,6 +273,31 @@ AREAS: dict[str, dict[str, Any]] = {
              "location": {"type": "Point", "coordinates": [85.319, 27.668]}},
         ],
     },
+    # Resident routing for Rasuwa uses the client-side road graph, so the
+    # catalog is empty. Counts and signals are PLACEHOLDER simulated values,
+    # not observations.
+    "rasuwa": {
+        "placeholder": True,  # no real risk data; callers must not rank or score it
+        "name": "Rasuwa",
+        "center": [85.46, 28.17],
+        "population": 0,
+        "distress_calls": 0,
+        "injuries": 0,
+        "vulnerable_population": 0,
+        "road_accessibility": 1.0,
+        "signals": {
+            "rainfall_mm": 0,
+            "river_level_m": 0,
+            "elevation_m": 1500,
+            "slope_deg": 10.0,
+            "soil_moisture": 0.0,
+            "forecast_severity": 0.0,
+        },
+        "shelters": [],
+        "routes": [],
+        "roads": [],
+        "hospitals": [],
+    },
 }
 
 
