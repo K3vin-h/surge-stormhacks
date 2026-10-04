@@ -17,14 +17,20 @@ const AREA_CENTERS = {
   kathmandu_valley: [27.709, 85.324],
 };
 
+let sessionDeviceId;
+
 function deviceId() {
-  let id = localStorage.getItem("surge_device_id");
-  if (!id) {
-    id = (crypto.randomUUID && crypto.randomUUID()) ||
-      "dev-" + Math.random().toString(36).slice(2);
-    localStorage.setItem("surge_device_id", id);
+  if (sessionDeviceId) return sessionDeviceId;
+  try { sessionDeviceId = localStorage.getItem("surge_device_id"); }
+  catch (_) { /* Storage may be blocked; keep the identity in memory. */ }
+  if (!sessionDeviceId) {
+    // getRandomValues works on plain-http origins where randomUUID doesn't.
+    sessionDeviceId = (crypto.randomUUID && crypto.randomUUID()) ||
+      "dev-" + Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) => b.toString(16).padStart(2, "0")).join("");
+    try { localStorage.setItem("surge_device_id", sessionDeviceId); }
+    catch (_) { /* Quota/privacy failures must not prevent chat or SOS. */ }
   }
-  return id;
+  return sessionDeviceId;
 }
 
 async function api(path, opts = {}) {

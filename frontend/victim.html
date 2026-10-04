@@ -138,7 +138,13 @@
     #tab-map { padding: 0; overflow: hidden; }
     #map { position: absolute; inset: 0; z-index: 0; }
     .attrib { font-size: 10.5px; color: var(--muted); text-align: center; padding-top: 10px; }
-    #tab-map .map-legend { left: 12px; right: 64px; top: 12px; width: auto; flex-wrap: wrap; }
+    #tab-map .map-toggles { position: absolute; z-index: 500; left: 12px; right: 64px; top: 12px; display: flex; flex-wrap: wrap; gap: 6px; }
+    .map-toggles button {
+      border: 1px solid transparent; background: rgba(251, 250, 245, .95); box-shadow: var(--shadow);
+      border-radius: 999px; padding: 6px 10px; font-size: 11.5px; font-weight: 650; color: var(--muted);
+    }
+    .map-toggles button[aria-pressed="true"] { color: var(--ink); border-color: var(--line); }
+    .map-toggles button:focus-visible { outline: 2px solid var(--brand-sage); outline-offset: 2px; }
     .locate { position: absolute; right: 12px; top: 12px; z-index: 500; width: 40px; height: 40px; border-radius: 12px; border: none; background: var(--surface); box-shadow: var(--shadow); display: grid; place-items: center; color: var(--ink); }
     .sheet {
       position: absolute; left: 0; right: 0; bottom: 0; z-index: 600; background: var(--surface); border-radius: 26px 26px 0 0;
@@ -247,7 +253,7 @@
         <!-- MAP -->
         <section class="tab" id="tab-map" hidden>
           <div id="map"></div>
-          <div id="legendSlot"></div>
+          <div class="map-toggles" id="legendSlot"></div>
           <button class="locate" id="locateBtn" aria-label="Show my location"><span data-icon="locate"></span></button>
           <div class="sheet collapsed" id="sheet">
             <button class="grab" id="grab" aria-label="Expand details"></button>
@@ -302,7 +308,7 @@
     const $ = (id) => document.getElementById(id);
     let current = "sunsari";
     let tab = "home";
-    let map, layer, myLoc = null, lastResponseId = null;
+    let map, mapGroups = {}, myLoc = null, lastResponseId = null;
     let status = null, mapData = null, mapSig = "", needsFit = true, alertFilter = "all";
     // Tracks the instruction id the user has already been briefed on.
     // undefined = not yet baselined (first poll sets it silently).
@@ -313,7 +319,6 @@
     document.querySelectorAll("[data-icon]").forEach((el) => { el.innerHTML = icon(el.dataset.icon, el.closest(".tabbar") ? 22 : 18); });
     $("logo").innerHTML = LOGO_SVG;
     $("wordmark").innerHTML = wordmark();
-    $("legendSlot").innerHTML = legendHtml();
 
     function tickClock() {
       const h = new Date().getHours();
@@ -478,15 +483,15 @@
       const sig = JSON.stringify([current, mapData.current_instruction_id, mapData.reports, mapData.closed_roads, myLoc]);
       if (sig === mapSig) return;
       mapSig = sig;
-      layer.clearLayers();
-      drawAreaZone(layer, mapData.geometry, mapData.risk_level);
-      if (mapData.approved_route) drawRoute(layer, mapData.approved_route.geometry, `<b>Approved route</b><br>${esc(mapData.approved_route.name)}`);
-      const add = (ll, kind, popup, size) => ll && L.marker(ll, { icon: pinIcon(kind, size) }).bindPopup(popup).addTo(layer);
-      if (mapData.shelter) add(latLng(mapData.shelter.location), "shelter", `<b>${esc(mapData.shelter.name)}</b><br>Approved shelter`, 34);
-      mapData.hospitals.forEach((h) => add(latLng(h.location), "hospital", `<b>${esc(h.name)}</b><br>Hospital`));
-      mapData.closed_roads.forEach((r) => add(latLng(r.geometry), "closure", `<b>${esc(r.name)}</b><br>Closed — do not use`));
-      mapData.reports.forEach((r) => add(latLng(r.location), r.kind, `<b>${esc(reportInfo(r.kind).label)}</b><br>${esc(r.message)}`, 24));
-      if (myLoc) add([myLoc.lat, myLoc.lng], "me", "You are here", 18);
+      Object.values(mapGroups).forEach((g) => g.clearLayers());
+      drawAreaZone(mapGroups.zone, mapData.geometry, mapData.risk_level);
+      if (mapData.approved_route) drawRoute(mapGroups.route, mapData.approved_route.geometry, `<b>Approved route</b><br>${esc(mapData.approved_route.name)}`);
+      const add = (group, ll, kind, popup, size) => ll && L.marker(ll, { icon: pinIcon(kind, size) }).bindPopup(popup).addTo(mapGroups[group]);
+      if (mapData.shelter) add("shelter", latLng(mapData.shelter.location), "shelter", `<b>${esc(mapData.shelter.name)}</b><br>Approved shelter`, 34);
+      mapData.hospitals.forEach((h) => add("hospital", latLng(h.location), "hospital", `<b>${esc(h.name)}</b><br>Hospital`));
+      mapData.closed_roads.forEach((r) => add("closure", latLng(r.geometry), "closure", `<b>${esc(r.name)}</b><br>Closed — do not use`));
+      mapData.reports.forEach((r) => add("report", latLng(r.location), r.kind, `<b>${esc(reportInfo(r.kind).label)}</b><br>${esc(r.message)}`, 24));
+      if (myLoc) add("me", [myLoc.lat, myLoc.lng], "me", "You are here", 18);
       renderSheet();
       if (needsFit && tab === "map") fitMap();
     }
@@ -681,6 +686,7 @@
         const body = { area_id: current, question };
         if (myLoc) { body.latitude = myLoc.lat; body.longitude = myLoc.lng; }
         if (userLang) body.language = userLang;
+        body.device_id = deviceId();
         const r = await api("/api/chat", { method: "POST", body: JSON.stringify(body) });
         setThinking(false);
         handleAgent(r);
@@ -720,6 +726,7 @@
           fd.append("audio", blob, "clip.webm");
           if (myLoc) { fd.append("latitude", myLoc.lat); fd.append("longitude", myLoc.lng); }
           if (userLang) fd.append("language", userLang);
+          fd.append("device_id", deviceId());
           setThinking(true, "Transcribing…");
           try {
             const res = await fetch("/api/voice", { method: "POST", body: fd });
@@ -764,9 +771,12 @@
               location: { type: "Point", coordinates: [loc.lng, loc.lat] },
               reported_at: new Date().toISOString(),
               idempotency_key: deviceId() + ":" + kind + ":" + Date.now(),
+              device_id: deviceId(),
             }),
           });
-          out.innerHTML = `<span class="ok">${icon("check", 14)} Sent (${esc(VERIFICATION[r.verification_state] || r.verification_state)}). Emergency operations can see it now.</span>`;
+          out.innerHTML = r.moved && kind === "rescue_needed"
+            ? `<span class="ok">${icon("check", 14)} Your SOS location was updated. Emergency operations can see your new position.</span>`
+            : `<span class="ok">${icon("check", 14)} Sent (${esc(VERIFICATION[r.verification_state] || r.verification_state)}). Emergency operations can see it now.</span>`;
           out.querySelector(".icon").style.display = "inline";
           refresh();
         } catch (e) { out.innerHTML = `<span class="err">${esc(e.message)}</span>`; }
@@ -779,7 +789,33 @@
       tickClock();
       setInterval(tickClock, 30000);
       map = baseMap("map", AREA_CENTERS[current], 12, { controls: false });
-      layer = L.layerGroup().addTo(map);
+      mapGroups = {};
+      ["route", "zone", "shelter", "hospital", "closure", "report", "me"].forEach((k) => { mapGroups[k] = L.layerGroup(); });
+      const mapLayerDefaults = { route: true, zone: true, shelter: true, hospital: true, closure: true, report: true };
+      const mapLayers = (() => {
+        try { return { ...mapLayerDefaults, ...JSON.parse(localStorage.getItem("surge.victim.layers") || "{}") }; }
+        catch { return { ...mapLayerDefaults }; }
+      })();
+      function applyMapLayers() {
+        Object.entries(mapGroups).forEach(([k, g]) => {
+          const on = k === "me" || !!mapLayers[k];
+          if (on && !map.hasLayer(g)) g.addTo(map);
+          if (!on && map.hasLayer(g)) map.removeLayer(g);
+        });
+        $("legendSlot").querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", mapLayers[b.dataset.layer] ? "true" : "false"));
+      }
+      $("legendSlot").innerHTML = [
+        ["route", "Route"], ["zone", "Risk zone"], ["closure", "Closed roads"],
+        ["shelter", "Shelters"], ["hospital", "Hospitals"], ["report", "Reports"],
+      ].map(([k, label]) => `<button type="button" data-layer="${k}" aria-pressed="false">${label}</button>`).join("");
+      $("legendSlot").onclick = (e) => {
+        const btn = e.target.closest("[data-layer]");
+        if (!btn) return;
+        mapLayers[btn.dataset.layer] = !mapLayers[btn.dataset.layer];
+        localStorage.setItem("surge.victim.layers", JSON.stringify(mapLayers));
+        applyMapLayers();
+      };
+      applyMapLayers();
       addMsg("agent", "Assistant", "Hi, I’m the SURGE relief assistant. I answer using the official instruction for your area. Ask me anything, in any language — or tap the microphone to talk.");
       await refresh();
       setInterval(refresh, 3000);

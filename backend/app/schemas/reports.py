@@ -16,6 +16,8 @@ class SubmitReportRequest(BaseModel):
     reported_at: datetime | None = None
     # Optional client idempotency key to prevent duplicate SOS pins on retry.
     idempotency_key: str | None = None
+    # Browser device id; one active rescue_needed per device. Never echoed back.
+    device_id: str | None = Field(None, max_length=128)
 
 
 class Report(BaseModel):
@@ -35,6 +37,7 @@ class SubmitReportResponse(BaseModel):
     accepted: bool
     verification_state: VerificationState
     received_at: datetime
+    moved: bool = False
 
 
 class UpdateReportStateRequest(BaseModel):
