@@ -13,7 +13,7 @@ from ..fixtures import areas as fx
 from ..schemas.chat import AssistantResponse
 from ..schemas.common import InstructionType
 from ..schemas.instructions import PublishedInstruction
-from . import cache, gemini, reports as reports_svc
+from . import cache, gemini, memory, reports as reports_svc
 
 AUTHORITY_LINE = "Contact your local emergency authority for anything not covered here."
 
@@ -126,12 +126,23 @@ def agent_turn(
     geo-tagged government report using the same store as the manual buttons.
     """
     inst = cache.get_current(area_id)
+    # History is scoped to area + current instruction, so a different area or a
+    # newly published instruction never replays stale routes/shelters.
+    mem_key = (
+        f"{device_id}:{area_id}:{inst.publication_id if inst else ''}"
+        if device_id
+        else None
+    )
 
-    turn = gemini.converse(question, build_context(area_id), language_hint)
+    turn = gemini.converse(
+        question, build_context(area_id), language_hint, memory.get(mem_key)
+    )
+    remember = False  # only genuine model replies enter history
     if turn is not None:
         reply, event_type, summary = turn["reply"], turn["event_type"], turn["summary"]
         language = turn["language"]
         mode = "gemini_grounded"
+        remember = bool(reply)
     else:
         # Fallback: deterministic reply + keyword event extraction (English only).
         topic, _ = gemini.classify(question)
@@ -167,6 +178,11 @@ def agent_turn(
             report_kind = report.kind.value
         except Exception:
             report_filed = False
+
+    if remember and question.strip():  # empty voice transcripts carry no context
+        # Note a filed report so a follow-up doesn't file a duplicate.
+        note = " [A report was already filed to responders.]" if report_filed else ""
+        memory.add_turn(mem_key, question, reply + note)
 
     return AssistantResponse(
         response_id=response_id,

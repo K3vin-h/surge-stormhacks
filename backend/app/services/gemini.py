@@ -205,8 +205,24 @@ def safe_lang(code: object) -> str | None:
     return code if _BCP47.match(code) else None
 
 
+def _history_block(history: list[tuple[str, str]] | None) -> str:
+    """Earlier turns of this call, so follow-ups ('and the other road?') resolve.
+    Context only: it never overrides the official instruction or safety rules."""
+    if not history:
+        return ""
+    lines = "\n".join(f"{role.capitalize()}: {text}" for role, text in history)
+    return (
+        "=== EARLIER IN THIS CALL (oldest first; for context only. Earlier assistant "
+        "replies may be outdated: never repeat a route or shelter from them unless "
+        f"it matches the official context above) ===\n{lines}\n=== END ===\n\n"
+    )
+
+
 def converse(
-    question: str, context_text: str, language_hint: str | None = None
+    question: str,
+    context_text: str,
+    language_hint: str | None = None,
+    history: list[tuple[str, str]] | None = None,
 ) -> dict | None:
     """Structured turn: returns {reply, event_type, summary, language} or None if
     Gemini is unavailable (caller then uses the keyword + deterministic fallback).
@@ -245,6 +261,7 @@ def converse(
         "4. language: the BCP-47 code of the resident's language (e.g. 'en', "
         "'es', 'fr', 'ne', 'hi', 'zh').\n\n"
         f"=== OFFICIAL GOVERNMENT CONTEXT ===\n{context_text}\n=== END ===\n\n"
+        f"{_history_block(history)}"
         f"Resident says: {question}\n\n"
         "Return JSON exactly like: "
         '{"reply": "...", "event_type": "none", "summary": "", "language": "en"}'
