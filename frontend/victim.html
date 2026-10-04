@@ -458,8 +458,7 @@
       const card = $("instCard");
       const inst = status.instruction;
       const risk = riskInfo(status.summary.risk_level);
-      const scored = typeof status.summary.risk_score === "number" && risk.label !== "Risk data unavailable";
-      $("riskMeta").innerHTML = pill(scored ? `${risk.label} · ${Math.round(status.summary.risk_score * 100)}/100` : risk.label, risk.tone);
+      $("riskMeta").innerHTML = pill(risk.label, risk.tone);
       $("nextMeta").textContent = inst && inst.next_update_at ? fmtClock(inst.next_update_at) : "when issued";
       if (!inst) {
         card.className = "inst none";

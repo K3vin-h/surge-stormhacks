@@ -9,8 +9,8 @@ from typing import Literal
 from pydantic import BaseModel, Field, field_validator
 
 # Canonical area IDs (API values). UI labels are mapped by the frontend.
-AREA_IDS = ("sunsari", "saptari", "bardiya", "kathmandu_valley", "rasuwa")
-AreaId = Literal["sunsari", "saptari", "bardiya", "kathmandu_valley", "rasuwa"]
+AREA_IDS = ("sunsari", "saptari", "bardiya", "kathmandu_valley", "sfu", "rasuwa")
+AreaId = Literal["sunsari", "saptari", "bardiya", "kathmandu_valley", "sfu", "rasuwa"]
 
 
 class PublicationState(str, Enum):
