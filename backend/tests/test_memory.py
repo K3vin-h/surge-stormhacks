@@ -4,7 +4,7 @@ from uuid import uuid4
 
 import pytest
 
-from backend.app.services import answers, gemini, memory
+from app.services import answers, gemini, memory
 
 
 @pytest.fixture(autouse=True)

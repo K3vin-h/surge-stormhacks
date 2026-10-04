@@ -15,7 +15,7 @@ from ..schemas.instructions import (
     PublishResponse,
 )
 from ..schemas.reports import Report, ReportsResponse, UpdateReportStateRequest
-from ..services import cache, events, instructions, models, reports as reports_svc
+from ..services import cache, events, instructions, models, reports as reports_svc, slate
 from ..util import decode_cursor, next_cursor, now_utc
 
 router = APIRouter(prefix="/api/government")
@@ -102,6 +102,12 @@ def gov_reports(
         reports=rows,
         next_cursor=next_cursor(offset, limit, len(rows)),
     )
+
+
+@router.post("/reset")
+def reset_slate() -> dict[str, int]:
+    """Delete every report, official message, and activity entry."""
+    return slate.clear_slate()
 
 
 @router.patch("/reports/{report_id}", response_model=Report)

@@ -30,8 +30,7 @@ def _answer(area_id: str, question: str, location=None, language=None, device_id
 def chat(req: ChatRequest):
     if fx.get_area(req.area_id) is None:
         raise not_found(f"Unknown area '{req.area_id}'.")
-    return _answer(req.area_id, req.question, _loc(req.latitude, req.longitude), req.language,
-                   req.device_id)
+    return _answer(req.area_id, req.question, _loc(req.latitude, req.longitude), req.language, req.device_id)
 
 
 @router.post("/voice", response_model=VoiceResponse)
@@ -41,7 +40,7 @@ async def voice(
     latitude: float | None = Form(None),
     longitude: float | None = Form(None),
     language: str | None = Form(None),
-    device_id: str | None = Form(None, max_length=64),
+    device_id: str | None = Form(None, max_length=128),
 ) -> VoiceResponse:
     if fx.get_area(area_id) is None:
         raise not_found(f"Unknown area '{area_id}'.")
@@ -51,8 +50,7 @@ async def voice(
     if audio.content_type and audio.content_type not in ALLOWED_AUDIO:
         raise validation_error(f"Unsupported audio type '{audio.content_type}'.")
     transcript = elevenlabs.transcribe(data, audio.content_type or "audio/webm")
-    response = _answer(area_id, transcript or "", _loc(latitude, longitude), language,
-                       device_id)
+    response = _answer(area_id, transcript or "", _loc(latitude, longitude), language, device_id)
     return VoiceResponse(transcript=transcript, response=response)
 
 

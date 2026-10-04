@@ -128,12 +128,13 @@ def area_map(area_id: str) -> PublicMapResponse:
 @router.post("/reports", response_model=SubmitReportResponse)
 def submit_report(req: SubmitReportRequest) -> SubmitReportResponse:
     _require_area(req.area_id)
-    report, created = reports_svc.submit(req)
+    report, _created, moved = reports_svc.submit(req)
     return SubmitReportResponse(
         report=report,
         accepted=True,
         verification_state=report.verification_state,
         received_at=report.received_at,
+        moved=moved,
     )
 
 
