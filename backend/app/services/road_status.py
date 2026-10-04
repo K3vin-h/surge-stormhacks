@@ -14,7 +14,7 @@ from ..schemas.roads import RoadStatus, RoadStatusResponse
 from ..util import now_utc
 from . import events
 
-AREA_ID = "rasuwa"
+AREA_ID = "rasuwa"  # Placeholder area used by the existing Rasuwa chat context.
 
 # Writers replace a row with DELETE + INSERT and readers must never see the gap
 # (a closed road reading as open), so both sides hold this lock.
@@ -23,17 +23,23 @@ _lock = threading.Lock()
 
 
 PREPARED_JSON = REPO_ROOT / "frontend" / "rasuwa" / "data" / "prepared.json"
+SUNSARI_PREPARED_JSON = REPO_ROOT / "frontend" / "sunsari" / "data" / "prepared.json"
 
 # ponytail: this process is the only writer, so the cache is never stale; multi-process needs a TTL or version row.
 _cache: RoadStatusResponse | None = None
 
 
-@functools.lru_cache(maxsize=1)
-def allowed_road_ids() -> frozenset[str]:
-    """Rasuwa road ids from the prepared graph; fails closed if it is unreadable."""
+@functools.lru_cache(maxsize=3)
+def allowed_road_ids(area: str | None = None) -> frozenset[str]:
+    """Mapped planner road IDs; fail closed if any requested network is unreadable."""
     try:
-        data = json.loads(PREPARED_JSON.read_text(encoding="utf-8"))
-        return frozenset(f["properties"]["id"] for f in data["map"]["roads"]["features"])
+        paths = {"rasuwa": PREPARED_JSON, "sunsari": SUNSARI_PREPARED_JSON}
+        selected = [paths[area]] if area else paths.values()
+        ids = set()
+        for path in selected:
+            data = json.loads(path.read_text(encoding="utf-8"))
+            ids.update(f["properties"]["id"] for f in data["map"]["roads"]["features"])
+        return frozenset(ids)
     except (OSError, ValueError, KeyError, TypeError) as exc:
         raise ApiError(503, "road_data_unavailable", "Road network data is unavailable.") from exc
 
@@ -91,5 +97,6 @@ def set_status(road_id: str, status: str, note: str | None) -> RoadStatus:
             )
         _cache = _build()
     if existed or status != "open":
-        events.record_event("road_status", f"Road {road_id} set to {status}", AREA_ID)
+        area = "sunsari" if road_id in allowed_road_ids("sunsari") else "rasuwa"
+        events.record_event("road_status", f"Road {road_id} set to {status}", area)
     return RoadStatus(road_id=road_id, status=status, note=note, updated_at=now)

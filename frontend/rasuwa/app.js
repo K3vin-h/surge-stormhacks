@@ -136,7 +136,10 @@ function search(afterClosure = false) {
 
 async function start() {
   try {
-    const response = await fetch(new URL('./data/prepared.json', import.meta.url), { signal: AbortSignal.timeout(15000) });
+    const datasetUrl = document.body.dataset.dataset
+      ? new URL(document.body.dataset.dataset, document.baseURI)
+      : new URL('./data/prepared.json', import.meta.url);
+    const response = await fetch(datasetUrl, { signal: AbortSignal.timeout(15000) });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     data = await response.json();
     if (data.format_version !== 1 || !data.map?.settlements?.features || !data.graphs?.walking || !data.graphs?.vehicle) throw new Error('Unsupported geographic dataset');
@@ -161,13 +164,13 @@ async function start() {
       card.append(title, body, time);
       element('sensor-readings').append(card);
     }
-    element('dataset-label').textContent = `${data.map.settlements.features.length} origins · ${data.map.wards.features.length} wards · dataset ${data.dataset_version}`;
+    element('dataset-label').textContent = `${data.map.settlements.features.length} origins · ${data.map.wards.features.length} ${document.body.dataset.regionLabel || 'wards'} · dataset ${data.dataset_version}`;
     village.disabled = false;
     element('mode-controls').disabled = false;
     for (const input of Object.values(inputs)) input.disabled = false;
     try {
       map = createMap(element('map'), data.map, {
-        config: mapConfig,
+        config: { ...mapConfig, ...data.manifest?.view, fitDistrict: document.body.dataset.fitDistrict === 'true' },
         onVillage: id => { village.value = id; search(); },
         onNotice: text => { element('map-notice').hidden = false; element('map-notice').textContent = text; },
         onRoad: properties => { map.selectRoad(properties.id); window.dispatchEvent(new CustomEvent('road-pick', { detail: properties })); },
