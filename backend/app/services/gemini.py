@@ -7,6 +7,7 @@ All generation is grounded in the current official instruction and governed by
 SAFETY_PROMPT. If Gemini is unavailable we fall back to deterministic keyword
 logic so everything still works.
 """
+
 from __future__ import annotations
 
 import json
@@ -101,7 +102,15 @@ def _parse_json(text: str) -> dict | None:
                 return None
         return None
 
-ALLOWED_TOPICS = {"status", "shelter", "route", "roads_to_avoid", "next_update", "unsupported"}
+
+ALLOWED_TOPICS = {
+    "status",
+    "shelter",
+    "route",
+    "roads_to_avoid",
+    "next_update",
+    "unsupported",
+}
 
 # Backend-owned safety prompt. Never accepted from the browser.
 SAFETY_PROMPT = (
@@ -126,7 +135,7 @@ CLASSIFY_INSTRUCTION = (
     "You are a strict intent classifier for a flood-emergency assistant. "
     "Read the resident's question and choose exactly one topic from this set: "
     "status, shelter, route, roads_to_avoid, next_update, unsupported. "
-    "Return ONLY compact JSON of the form {\"topic\": \"<one_topic>\"}. "
+    'Return ONLY compact JSON of the form {"topic": "<one_topic>"}. '
     "Use 'unsupported' for anything outside these topics. Do not add other keys "
     "or text."
 )
@@ -136,7 +145,10 @@ _KEYWORDS = [
     ("shelter", r"\b(shelter|where.*stay|safe place|refuge|camp)\b"),
     ("roads_to_avoid", r"\b(road|bridge|avoid|closed|blocked|underpass|detour)\b"),
     ("next_update", r"\b(next update|when.*update|how long|again|news)\b"),
-    ("status", r"\b(status|situation|what.*happening|summar|safe|danger|next action)\b"),
+    (
+        "status",
+        r"\b(status|situation|what.*happening|summar|safe|danger|next action)\b",
+    ),
 ]
 
 
@@ -154,7 +166,9 @@ REPORT_KINDS = {"rescue_needed", "road_hazard", "rescue_seen"}
 # Presence-based (no proximity window): if the required word groups both
 # appear anywhere in the utterance, classify it.
 _WITNESS = r"\b(see|saw|seeing|someone|somebody|people|person|neighbou?r|kid|child|man|woman|family|they'?re)\b"
-_DANGER = r"\b(stuck|trapped|stranded|drowning|swept|on the roof|injured|hurt|bleeding)\b"
+_DANGER = (
+    r"\b(stuck|trapped|stranded|drowning|swept|on the roof|injured|hurt|bleeding)\b"
+)
 _SELF = r"\b(i'?m|i am|we'?re|we are|me|my|us|our)\b"
 _SELF_DISTRESS = r"\b(trapped|stuck|stranded|drowning|rescue|injured|hurt|bleeding|dying|can'?t get out|save us|save me|help us|help me)\b"
 _ROADWORD = r"\b(road|bridge|street|highway|underpass|path|route|lane)\b"
@@ -175,19 +189,28 @@ def detect_event_keyword(text: str) -> str:
     return "none"
 
 
-def converse(question: str, context_text: str, language_hint: str | None = None) -> dict | None:
+def converse(
+    question: str, context_text: str, language_hint: str | None = None
+) -> dict | None:
     """Structured turn: returns {reply, event_type, summary, language} or None if
     Gemini is unavailable (caller then uses the keyword + deterministic fallback).
 
-    Multilingual: the reply is written in the SAME language the resident used
-    (so a foreign visitor can call in their own language), while `summary` stays
-    in English for responders. `language` is the detected BCP-47 code.
+    Multilingual: the reply is written in the SAME language as the resident's
+    latest message, re-detected every turn (so a caller can switch language
+    mid-conversation), while `summary` stays in English for responders.
+    `language` is the detected BCP-47 code.
     """
+    # The hint is only a tie-breaker: forcing it would trap a caller in the
+    # language of an earlier turn when they switch (e.g. English -> Spanish).
     lang_line = (
-        f"The resident's language is '{language_hint}'. Write 'reply' in that language.\n"
-        if language_hint else
-        "Detect the language the resident is using and write 'reply' in THAT "
-        "SAME language (e.g. a Spanish caller gets a Spanish reply).\n"
+        "Detect the language of the resident's CURRENT message and write 'reply' "
+        "in THAT SAME language, even if it differs from earlier turns "
+        "(e.g. a Spanish message gets a Spanish reply). "
+        + (
+            f"Only if the message is too short or ambiguous to tell, use '{language_hint}'.\n"
+            if language_hint
+            else "\n"
+        )
     )
     prompt = (
         "You are a live disaster-relief assistant on a voice call with a "
@@ -206,11 +229,12 @@ def converse(question: str, context_text: str, language_hint: str | None = None)
         "'es', 'fr', 'ne', 'hi', 'zh').\n\n"
         f"=== OFFICIAL GOVERNMENT CONTEXT ===\n{context_text}\n=== END ===\n\n"
         f"Resident says: {question}\n\n"
-        'Return JSON exactly like: '
+        "Return JSON exactly like: "
         '{"reply": "...", "event_type": "none", "summary": "", "language": "en"}'
     )
-    text = _generate(prompt, system=SAFETY_PROMPT, temperature=0.3,
-                     max_tokens=400, json_mode=True)
+    text = _generate(
+        prompt, system=SAFETY_PROMPT, temperature=0.3, max_tokens=400, json_mode=True
+    )
     data = _parse_json(text) if text else None
     if data is None:
         return None
@@ -271,7 +295,9 @@ def classify(question: str) -> tuple[str, str]:
     """Return (topic, mode). mode is 'gemini_grounded' or 'deterministic'."""
     text = _generate(
         f"{CLASSIFY_INSTRUCTION}\n\nResident question: {question}",
-        system=SAFETY_PROMPT, temperature=0.0, json_mode=True,
+        system=SAFETY_PROMPT,
+        temperature=0.0,
+        json_mode=True,
     )
     data = _parse_json(text) if text else None
     if data is None:
