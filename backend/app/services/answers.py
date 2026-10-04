@@ -91,13 +91,14 @@ def build_context(area_id: str) -> str:
     inst = cache.get_current(area_id)
     if a.get("placeholder"):
         lines.append("No risk data is available for this area.")
-        if area_id == road_status.AREA_ID:
-            closed = [
-                f"{r.road_id}" + (f" ({r.note})" if r.note else "")
-                for r in road_status.list_roads().roads
-            ]
-            if closed:
-                lines.append("Currently closed or flooded roads: " + ", ".join(closed) + ".")
+    if area_id in (road_status.AREA_ID, "sunsari"):
+        network = road_status.allowed_road_ids(area_id)
+        closed = [
+            f"{r.road_id}" + (f" ({r.note})" if r.note else "")
+            for r in road_status.list_roads().roads if r.road_id in network
+        ]
+        if closed:
+            lines.append("Currently closed or flooded mapped roads: " + ", ".join(closed) + ".")
     if inst:
         lines.append(f"Current official instruction: {inst.instruction_type.value}.")
         lines.append(f"Official message: {inst.emergency_message}")
