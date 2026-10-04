@@ -7,9 +7,25 @@ const empty = collection([]);
 export function createMap(element, data, { config, onVillage, onNotice, onCell, onRoad }) {
   maplibre.setWorkerUrl(new URL('./vendor/maplibre-gl-worker.mjs', import.meta.url).href);
   const hasImagery = !!(config.satelliteTiles && config.satelliteAttribution);
+  let bounds;
+  if (config.fitDistrict) {
+    const points = [];
+    const collect = coordinates => {
+      if (typeof coordinates[0] === 'number') points.push(coordinates);
+      else coordinates.forEach(collect);
+    };
+    data.district.features.forEach(feature => collect(feature.geometry.coordinates));
+    if (points.length) {
+      bounds = points.reduce((box, [lng, lat]) => [
+        [Math.min(box[0][0], lng), Math.min(box[0][1], lat)],
+        [Math.max(box[1][0], lng), Math.max(box[1][1], lat)]
+      ], [[Infinity, Infinity], [-Infinity, -Infinity]]);
+    }
+  }
   const map = new maplibre.Map({
     container: element,
-    center: [85.35, 28.2], zoom: 11, maxZoom: 18,
+    center: config.center ?? [85.35, 28.2], zoom: config.zoom ?? 11, maxZoom: 18,
+    ...(bounds ? { bounds, fitBoundsOptions: { padding: 30 } } : {}),
     attributionControl: false,
     style: {
       version: 8, glyphs: config.glyphs,
@@ -68,8 +84,6 @@ export function createMap(element, data, { config, onVillage, onNotice, onCell, 
     const sensorOnly = ['==', ['get', 'risk_level'], 'Unknown'];
     const riskColor = ['case', sensorOnly, levelColor(['get', 'sensor_risk_level']), levelColor(['get', 'risk_level'])];
     layer('risk-fill', 'fill', 'risk-zones', { 'fill-color': riskColor, 'fill-opacity': ['case', sensorOnly, 0.4, 0.68] });
-    layer('risk-outline-halo', 'line', 'risk-zones', { 'line-color': '#0f172a', 'line-width': 3 });
-    layer('risk-outline', 'line', 'risk-zones', { 'line-color': riskColor, 'line-width': 1.5, 'line-opacity': ['case', sensorOnly, 0.5, 1] });
     layer('hazards-fill', 'fill', 'hazards', { 'fill-color': '#ef4444', 'fill-opacity': 0.85 });
     layer('wards-halo', 'line', 'wards', { 'line-color': '#142b38', 'line-width': 6 });
     layer('wards-line', 'line', 'wards', { 'line-color': '#fff', 'line-width': 3 });
@@ -125,7 +139,9 @@ export function createMap(element, data, { config, onVillage, onNotice, onCell, 
   return {
     update, setRoadStatus, selectRoad,
     setPicking: value => { picking = value; },
-    overview: () => map.jumpTo({ center: [85.35, 28.2], zoom: 11, pitch: 0, bearing: 0 }),
+    overview: () => bounds
+      ? map.fitBounds(bounds, { padding: 30, pitch: 0, bearing: 0, duration: 0 })
+      : map.jumpTo({ center: config.center ?? [85.35, 28.2], zoom: config.zoom ?? 11, pitch: 0, bearing: 0 }),
     destroy: () => { observer.disconnect(); map.remove(); }
   };
 }

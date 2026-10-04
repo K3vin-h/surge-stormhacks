@@ -2,6 +2,8 @@
 
 This extends the standalone Rasuwa map and evacuation-candidate routing migrated from [`stormhacks-26`](https://github.com/awang1809/stormhacks-26), source commit `8b3c7ad189edc6f2cd354e5479ec59a7238c3edb`. It uses plain HTML/JavaScript, a JSON sensor heuristic, and an optional government workspace connected to the existing SURGE API. It does not import the source repository's backend or trained models.
 
+A separate [Sunsari planner](../sunsari/README.md) reuses these modules with its own full mapped road network, municipal boundaries, and simulated sensor JSON. The sidebar links between the two pages. Risk fills have no internal coverage outlines; real geographic boundaries and road outlines remain visible.
+
 ## Run without a backend
 
 Use Node.js 20 or newer:
@@ -12,9 +14,9 @@ npm ci
 npm run serve
 ```
 
-Open **http://127.0.0.1:3010/rasuwa/**. The SURGE home page also links to the planner. The pinned MapLibre files are committed in `vendor/`, so a clone can open the planner without `npm ci`. Running `npm ci` refreshes that folder from the pinned `maplibre-gl` version. No bundler or Next.js server is needed. Do not open the HTML as a `file://` URL: browser module and data fetching require HTTP.
+Open **http://127.0.0.1:3010/rasuwa/** or **http://127.0.0.1:3010/sunsari/**. The government dashboard opens the planner from its route button. The pinned MapLibre files are committed in `vendor/`, so a clone can open the planner without `npm ci`. Running `npm ci` refreshes that folder from the pinned `maplibre-gl` version. No bundler or Next.js server is needed. Do not open the HTML as a `file://` URL: browser module and data fetching require HTTP.
 
-The existing SURGE backend already serves `frontend/` as static files, including `vendor/`, so `/rasuwa/` works on that server immediately. Local routing makes **no `/api/` requests** until **Connect government API** is clicked. On the backend server, that button loads ranked areas, current directives, operational events, and reports, and enables publishing and model refresh. The API areas are Sunsari, Saptari, Bardiya, and Kathmandu Valley; they are explicitly separate from the Rasuwa geographic map. A static-only server shows an unavailable status for government operations while local routing continues.
+The existing SURGE backend serves both planner pages. Routing runs locally, and each page loads public road closures on startup from `/api/public/roads/status`. **Connect government API** loads ranked areas, current directives, operational events, and reports, and enables publishing and model refresh. The API areas are Sunsari, Saptari, Bardiya, and Kathmandu Valley; they are explicitly separate from the Rasuwa geographic map. A static-only server shows an unavailable closure-information notice while local routing continues.
 
 For any static deployment, publish `frontend/` with the generated `rasuwa/vendor/` assets included. Do not deploy just the HTML page or omit its modules/data. Existing government/resident pages still require their existing backend; this standalone serving command is specifically for the new planner.
 
@@ -33,7 +35,7 @@ Limits have no automatic default. Distances are along mapped graph edges, exclud
 
 After **Connect government API**, click any mapped road on the map to select it (highlighted yellow), then use the **Road closures** panel to set it **Open**, **Closed**, or **Flooded**, with an optional note (up to 200 characters). This does `PUT /api/government/roads/{road_id}` using the OSM way id. Statuses are stored by the backend and shared: `GET /api/public/roads/status` returns the non-open roads and is reloaded on the existing 15-second government refresh, so every client that connects sees the same closures.
 
-Closed roads draw as long red dashes and flooded roads as short blue dashes. Route search passes all closed and flooded road ids as `blocked` to `recommend()`, so no candidate route crosses them. When statuses change, the search re-runs; if the previously selected destination becomes unreachable, the status text says so. Before connecting, no `/api/` request is made and nothing is blocked. If the status endpoint fails, the last known statuses stay in effect. Picking roads is mouse/touch only on the map; the status buttons and note field are keyboard-operable.
+Closed roads draw as long red dashes and flooded roads as short blue dashes. Route search passes all closed and flooded road ids as `blocked` to `recommend()`, so no candidate route crosses them. When statuses change, the search re-runs; if the previously selected destination becomes unreachable, the status text says so. Public closures load before connecting; government polling keeps them updated after connecting. If the status endpoint fails, the last known statuses stay in effect. Picking roads is mouse/touch only on the map; the status buttons and note field are keyboard-operable.
 
 ## Included geography and scenario
 

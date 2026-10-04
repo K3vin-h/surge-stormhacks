@@ -1,7 +1,7 @@
 import { roadLabel } from './road-status.js';
 
 const element = id => document.getElementById(`gov-${id}`);
-let areas = [], current = '', catalog = null, generation = 0, timer, publishing = false;
+let areas = [], current = document.body.dataset.governmentArea || '', catalog = null, generation = 0, timer, publishing = false;
 
 async function api(path, options = {}) {
   const response = await fetch(path, {

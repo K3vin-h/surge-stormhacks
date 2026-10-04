@@ -1,4 +1,5 @@
 import sys
+import json
 import threading
 from pathlib import Path
 
@@ -25,7 +26,7 @@ def local_db(tmp_path, monkeypatch):
 
 
 client = TestClient(app)
-A, B = sorted(road_status.allowed_road_ids())[:2]
+A, B = sorted(road_status.allowed_road_ids('rasuwa'))[:2]
 
 
 def put(road, status, note=None):
@@ -153,6 +154,19 @@ def test_unknown_road_id_404_known_ok():
     r = put("osm-way-999999999999", "closed")
     assert r.status_code == 404 and r.json()["error"]["code"] == "not_found"
     assert put(A, "closed").status_code == 200
+
+
+def test_sunsari_roads_can_be_closed_and_events_use_sunsari():
+    network = json.loads((road_status.PREPARED_JSON.parents[2] / 'sunsari' / 'data' / 'prepared.json').read_text())
+    road = network['map']['roads']['features'][0]['properties']['id']
+    assert put(road, 'closed', 'Bridge blocked').status_code == 200
+    assert pub()['roads'][0]['road_id'] == road
+    event = next(e for e in events.list_events(limit=50) if e.kind == 'road_status')
+    assert event.area_id == 'sunsari'
+    assert road in answers.build_context('sunsari')
+    assert road not in answers.build_context('rasuwa')
+    assert put(road, 'open').status_code == 200
+    assert pub()['roads'] == []
 
 
 def test_allowlist_fails_closed_when_data_missing(monkeypatch):

@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>SURGE — Sunsari route planner</title>
+  <link rel="stylesheet" href="../theme.css?v=brand6" />
+  <link rel="stylesheet" href="../rasuwa/vendor/maplibre-gl.css" />
+  <link rel="stylesheet" href="../rasuwa/styles.css?v=embed3" />
+  <script>if (new URLSearchParams(location.search).has("embed")) document.documentElement.classList.add("embed");</script>
+</head>
+<body data-dataset="./data/prepared.json" data-region-label="mapped regions" data-government-area="sunsari" data-fit-district="true">
+  <div class="shell">
+    <aside class="sidebar">
+      <a class="brand" href="../index.html">
+        <span data-logo></span>
+        <span data-wordmark></span>
+      </a>
+      <nav aria-label="SURGE navigation">
+        <div class="side-label">Operations</div>
+        <a class="nav-item" href="../gov.html"><span data-icon="grid"></span>Dashboard</a>
+        <a class="nav-item active" href="./" aria-current="page"><span data-icon="route"></span>Sunsari planner</a>
+        <a class="nav-item" href="../rasuwa/"><span data-icon="route"></span>Rasuwa planner</a>
+      </nav>
+      <div class="side-spacer"></div>
+      <a class="side-card" href="../victim.html" target="_blank" rel="noopener"><span class="grow">Resident app preview</span><span data-icon="chevronRight"></span></a>
+    </aside>
+
+    <div class="main">
+      <header class="topbar">
+        <div>
+          <div class="eyebrow">Sunsari, Nepal</div>
+          <div class="title">Route planner</div>
+        </div>
+        <span class="pill tone-amber"><i class="dot"></i>Sensor JSON + mapped geography</span>
+      </header>
+
+      <main class="view">
+        <div class="page-head">
+          <div>
+            <div class="eyebrow">Regional overview</div>
+            <h1>Regional risk &amp; response</h1>
+            <p>Inspect sensor risk, compare mapped routes, and manage government operations.</p>
+          </div>
+        </div>
+        <div class="notice simulation"><span data-icon="broadcast"></span><span><b>Hackathon simulation.</b> Real mapped geography; simulated sensor readings. No live emergency guidance.</span></div>
+        <div id="load-error" role="alert" hidden></div>
+
+        <div class="workspace">
+          <aside class="card planner" aria-label="Route planning">
+            <div class="eyebrow">Route search</div>
+            <h2>Route planning</h2>
+            <label for="village">Origin town or village</label>
+            <select id="village" disabled><option value="">Select a mapped town or village</option></select>
+            <fieldset class="modes" disabled id="mode-controls"><legend>Travel mode</legend><label><input type="radio" name="mode" value="walking" checked />Walking</label><label><input type="radio" name="mode" value="vehicle" />Vehicle</label></fieldset>
+            <fieldset class="limits"><legend>Maximum mapped-route distance</legend><label for="walking-limit">Walking limit (metres)</label><input id="walking-limit" type="number" min="1" max="50000" step="any" inputmode="decimal" disabled /><label for="vehicle-limit">Vehicle limit (metres)</label><input id="vehicle-limit" type="number" min="1" max="50000" step="any" inputmode="decimal" disabled /></fieldset>
+            <p class="note">Routes follow mapped roads and paths. Distance excludes the unverified final approach. Mapped schools, hospitals, shelters, and community facilities are candidates for review.</p>
+            <p id="route-status" role="status">Loading bundled geographic data…</p>
+            <div id="candidates" aria-label="Candidate destinations"></div>
+            <section id="selection" hidden aria-label="Route review"><h2>Selected route</h2><p id="selected-name"></p><p id="selected-distance"></p><ul id="unknowns"></ul><a id="evidence" target="_blank" rel="noopener noreferrer" hidden>Inspect mapped destination</a><p class="note">Selection is local to this page and resets on reload. It does not publish an instruction or establish that the destination is safe.</p></section>
+            <details id="excluded" hidden><summary>Why other destinations were excluded</summary><ul id="exclusions"></ul></details>
+          </aside>
+
+          <section class="card map-workspace" aria-label="Geographic map and risk legend">
+            <div class="map-toolbar">
+              <div><div class="eyebrow">Geographic workspace</div><span id="dataset-label">Sunsari geographic workspace</span></div>
+              <button id="overview" class="btn btn-ghost btn-sm" disabled>Map overview</button>
+            </div>
+            <div class="map-frame"><div id="map" aria-label="Satellite map of Sunsari"></div><div id="map-caption">Strong outlines: mapped municipal boundaries • white dots: villages</div></div>
+            <p id="map-notice" role="status" hidden></p>
+            <div class="risk-legend" aria-label="Flood risk legend">
+              <span><i class="sw sw-extreme"></i>Extreme risk ≥ 0.80</span>
+              <span><i class="sw sw-high"></i>High risk ≥ 0.55</span>
+              <span><i class="sw sw-moderate"></i>Moderate risk ≥ 0.30</span>
+              <span><i class="sw sw-low"></i>Low risk &lt; 0.30</span>
+              <span><i class="sw sw-gray"></i>Gray: no sensor reading</span>
+              <small>JSON sensor heuristic with no observed flood extent. Municipal colors come from simulated readings. Green does not establish safety. Click a region for its readings.</small>
+            </div>
+            <p class="note map-key">White boundaries: municipalities · white roads with dark outlines · dashed gold: paths · dashed rose: roads closed in the source data · long red dashes: government-closed · short blue dashes: flooded · yellow glow: selected road · purple patches: open ground · cyan route: walking · lavender route: vehicle.</p>
+          </section>
+        </div>
+
+        <section class="card panel" aria-label="Regional sensor readings">
+          <div class="panel-head"><div><div class="eyebrow">Sensors</div><h2>Regional sensor readings</h2></div><span class="tag">Simulated</span></div>
+          <p class="note">Bundled simulated readings, not a live feed. Gray regions have no sensor reading. Municipal colors use simulated sensor readings; they do not show an observed flood extent.</p>
+          <div id="sensor-readings" class="sensor-grid"></div>
+          <p id="scenario" class="note"></p>
+          <p class="note">High-ground certification needs reviewed elevation, slope, and access evidence. Terrain tilt is a camera view, not measured terrain. No trained flood-risk or satellite-damage model is included.</p>
+        </section>
+
+        <section class="card panel government" aria-label="Government operations">
+          <div class="operations-header"><div><div class="eyebrow">Government workspace</div><h2>Coordinate the response</h2></div><button id="gov-connect" class="btn btn-primary" type="button">Connect government API</button></div>
+          <p class="note">The API currently serves Sunsari, Saptari, Bardiya and Kathmandu Valley. Directives apply to the selected API area; mapped candidates are separate from official API shelters and approved routes.</p>
+          <p id="gov-status" role="status">Connect to load ranked areas, reports and operational events.</p>
+          <div class="operations-grid">
+            <section><h3>Areas ranked by priority</h3><label for="gov-area">Government area</label><select id="gov-area" disabled></select><div id="gov-areas"></div><button id="gov-refresh-model" class="btn btn-ghost btn-sm" type="button" disabled>Recompute area models</button></section>
+            <section><h3>Publish / update directive</h3><form id="gov-form"><fieldset id="gov-fields" disabled><legend>Selected government area</legend>
+              <label for="gov-type">Instruction type</label><select id="gov-type"><option value="evacuate">Evacuate</option><option value="shelter_in_place">Shelter in place</option><option value="advisory">Advisory</option><option value="all_clear">All clear</option></select>
+              <label for="gov-message">Emergency message</label><textarea id="gov-message" rows="3" required maxlength="2000"></textarea>
+              <div id="gov-evac"><label for="gov-shelter">Shelter</label><select id="gov-shelter"></select><label for="gov-route">Approved route</label><select id="gov-route"></select></div>
+              <label for="gov-roads">Roads to avoid</label><select id="gov-roads" multiple size="3"></select>
+              <label for="gov-frequency">Update frequency (minutes)</label><input id="gov-frequency" type="number" min="1" max="10080" value="60" required>
+              <button class="btn btn-primary primary" id="gov-publish" type="submit">Publish directive</button>
+            </fieldset></form><p id="gov-publish-status" role="status"></p></section>
+            <section><h3>Operational events</h3><div id="gov-events">Connect to load events.</div><h3>Incoming community reports</h3><div id="gov-reports">Connect to load reports.</div></section>
+          </div>
+          <section id="gov-road" aria-labelledby="gov-road-heading"><h3 id="gov-road-heading">Road closures</h3>
+            <p class="note">After connecting, click a road on the map, then set its status. Closed and flooded roads are avoided by route search for everyone using this backend.</p>
+            <p id="gov-road-name">No road selected.</p>
+            <label for="gov-road-note">Note (optional)</label><input id="gov-road-note" type="text" maxlength="200" disabled>
+            <div class="road-actions"><button type="button" class="btn btn-ghost btn-sm" data-road-status="open" disabled>Open</button><button type="button" class="btn btn-ghost btn-sm" data-road-status="closed" disabled>Closed</button><button type="button" class="btn btn-ghost btn-sm" data-road-status="flooded" disabled>Flooded</button></div>
+            <p id="gov-road-status" role="status"></p>
+          </section>
+        </section>
+      </main>
+    </div>
+  </div>
+  <noscript>JavaScript is required to display geographic data and calculate routes.</noscript>
+  <script src="../common.js?v=brand6"></script>
+  <script>
+    document.querySelectorAll("[data-icon]").forEach((el) => { el.innerHTML = icon(el.dataset.icon, 18); });
+    document.querySelectorAll("[data-logo]").forEach((el) => { el.innerHTML = LOGO_SVG; });
+    document.querySelectorAll("[data-wordmark]").forEach((el) => { el.innerHTML = wordmark(); });
+  </script>
+  <script type="module">
+    import('../rasuwa/app.js').catch(() => {
+      const error = document.getElementById('load-error');
+      error.hidden = false;
+      error.textContent = 'The map application could not start. Run npm ci in frontend/rasuwa to prepare local MapLibre assets, then reload.';
+    });
+  </script>
+  <script type="module" src="../rasuwa/government.js"></script>
+</body>
+</html>

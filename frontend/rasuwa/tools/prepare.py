@@ -17,6 +17,7 @@ from shapely.ops import transform, unary_union
 
 ROOT = Path(__file__).resolve().parents[1]
 VEHICLE_ROADS = {"motorway", "trunk", "primary", "secondary", "tertiary", "unclassified", "residential", "service", "living_street"}
+VEHICLE_ROADS |= {f"{kind}_link" for kind in ("motorway", "trunk", "primary", "secondary", "tertiary")}
 
 
 def sensor_index(sensors):
@@ -91,6 +92,7 @@ def prepare(data, sensors=None):
     closed, barriers = set(data["closed_road_ids"]), set(data.get("blocked_node_ids", []))
     graphs = {}
     for mode in ("walking", "vehicle"):
+        mode_barriers = barriers | set(data.get("blocked_nodes_by_mode", {}).get(mode, []))
         nodes, adjacency = {}, {}
         for road in data["roads"]:
             props = road["properties"]
@@ -107,7 +109,7 @@ def prepare(data, sensors=None):
                 continue
             for a, b, ca, cb in zip(ids, ids[1:], coords, coords[1:]):
                 line = LineString([ca, cb])
-                if a in barriers or b in barriers or not coverage.covers(line) or hazard.intersects(line):
+                if a in mode_barriers or b in mode_barriers or not coverage.covers(line) or hazard.intersects(line):
                     continue
                 a, b = str(a), str(b)
                 nodes[a], nodes[b] = ca, cb
