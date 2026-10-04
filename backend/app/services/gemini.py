@@ -269,18 +269,14 @@ def converse(
     mid-conversation), while `summary` stays in English for responders.
     `language` is the detected BCP-47 code.
     """
-    language_hint = safe_lang(language_hint)
-    # The hint is only a tie-breaker: forcing it would trap a caller in the
-    # language of an earlier turn when they switch (e.g. English -> Spanish).
+    # HARDCODED: always reply in the language of the resident's CURRENT message,
+    # re-detected every turn. The language_hint is intentionally ignored here so
+    # a reply never carries over the language of an earlier turn.
     lang_line = (
-        "Detect the language of the resident's CURRENT message and write 'reply' "
-        "in THAT SAME language, even if it differs from earlier turns "
-        "(e.g. a Spanish message gets a Spanish reply). "
-        + (
-            f"Only if the message is too short or ambiguous to tell, use '{language_hint}'.\n"
-            if language_hint
-            else "\n"
-        )
+        "Detect the language of the resident's CURRENT message below and write "
+        "'reply' in THAT EXACT language — match the current message even if it is "
+        "a single word, and even if earlier turns used a different language. "
+        "NEVER reply in a language other than the current message's language.\n"
     )
     prompt = (
         "You are a live disaster-relief assistant on a voice call with a "
