@@ -4,6 +4,7 @@ Gemini only picks the topic; the operational facts come from the committed
 instruction in the cache. A ready cache with no instruction returns a
 deterministic no-instruction answer.
 """
+
 from __future__ import annotations
 
 import uuid
@@ -31,7 +32,9 @@ def _status_text(inst: PublishedInstruction) -> str:
         if inst.shelter:
             parts.append(f"Go to {inst.shelter.name}.")
     elif inst.instruction_type == InstructionType.all_clear:
-        parts.append("An all-clear has been issued; the prior evacuation route no longer applies.")
+        parts.append(
+            "An all-clear has been issued; the prior evacuation route no longer applies."
+        )
     return " ".join(parts)
 
 
@@ -60,7 +63,9 @@ def _next_update_text(inst: PublishedInstruction) -> str:
     if inst.next_update_at:
         return f"The next official update is expected by {inst.next_update_at.isoformat()}."
     if inst.update_frequency_minutes:
-        return f"Updates are issued about every {inst.update_frequency_minutes} minutes."
+        return (
+            f"Updates are issued about every {inst.update_frequency_minutes} minutes."
+        )
     return f"No next-update time is set. {AUTHORITY_LINE}"
 
 
@@ -86,7 +91,11 @@ def build_context(area_id: str) -> str:
         if inst.approved_route:
             lines.append(f"Approved evacuation route: {inst.approved_route.name}.")
         if inst.roads_to_avoid:
-            lines.append("Roads to avoid: " + ", ".join(r.name for r in inst.roads_to_avoid) + ".")
+            lines.append(
+                "Roads to avoid: "
+                + ", ".join(r.name for r in inst.roads_to_avoid)
+                + "."
+            )
         if inst.next_update_at:
             lines.append(f"Next official update by: {inst.next_update_at.isoformat()}.")
     else:
@@ -117,14 +126,23 @@ def agent_turn(
     geo-tagged government report using the same store as the manual buttons.
     """
     inst = cache.get_current(area_id)
+    # History is scoped to area + current instruction, so a different area or a
+    # newly published instruction never replays stale routes/shelters.
+    mem_key = (
+        f"{device_id}:{area_id}:{inst.publication_id if inst else ''}"
+        if device_id
+        else None
+    )
 
     turn = gemini.converse(
-        question, build_context(area_id), language_hint, memory.get(device_id)
+        question, build_context(area_id), language_hint, memory.get(mem_key)
     )
+    remember = False  # only genuine model replies enter history
     if turn is not None:
         reply, event_type, summary = turn["reply"], turn["event_type"], turn["summary"]
         language = turn["language"]
         mode = "gemini_grounded"
+        remember = bool(reply)
         if not reply:
             reply = _status_text(inst) if inst else _no_instruction(area_id)
     else:
@@ -138,9 +156,6 @@ def agent_turn(
 
     response_id = str(uuid.uuid4())
     cache.remember_response(response_id, reply)
-    # Skip empty transcripts and canned fallback replies (not model output).
-    if question.strip() and mode == "gemini_grounded":
-        memory.add_turn(device_id, question, reply)
 
     report_filed = False
     report_id = None
@@ -148,19 +163,27 @@ def agent_turn(
     if event_type in gemini.REPORT_KINDS and location is not None:
         from ..schemas.common import GeoPoint, ReportKind
         from ..schemas.reports import SubmitReportRequest
+
         lat, lng = location
         try:
-            report, _created = reports_svc.submit(SubmitReportRequest(
-                area_id=area_id,
-                kind=ReportKind(event_type),
-                message=summary or f"{event_type} reported via agent call",
-                location=GeoPoint(coordinates=[lng, lat]),
-            ))
+            report, _created = reports_svc.submit(
+                SubmitReportRequest(
+                    area_id=area_id,
+                    kind=ReportKind(event_type),
+                    message=summary or f"{event_type} reported via agent call",
+                    location=GeoPoint(coordinates=[lng, lat]),
+                )
+            )
             report_filed = True
             report_id = report.report_id
             report_kind = report.kind.value
         except Exception:
             report_filed = False
+
+    if remember and question.strip():  # empty voice transcripts carry no context
+        # Note a filed report so a follow-up doesn't file a duplicate.
+        note = " [A report was already filed to responders.]" if report_filed else ""
+        memory.add_turn(mem_key, question, reply + note)
 
     return AssistantResponse(
         response_id=response_id,
@@ -181,14 +204,18 @@ def agent_turn(
 
 def _diff_text(prev: PublishedInstruction | None, curr: PublishedInstruction) -> str:
     """Human-readable description of what changed between instructions."""
-    lines = [f"New instruction type: {curr.instruction_type.value}.",
-             f"New message: {curr.emergency_message}"]
+    lines = [
+        f"New instruction type: {curr.instruction_type.value}.",
+        f"New message: {curr.emergency_message}",
+    ]
     if curr.approved_route:
         lines.append(f"New approved route: {curr.approved_route.name}.")
     if curr.shelter:
         lines.append(f"New shelter: {curr.shelter.name}.")
     if curr.roads_to_avoid:
-        lines.append("Now avoid: " + ", ".join(r.name for r in curr.roads_to_avoid) + ".")
+        lines.append(
+            "Now avoid: " + ", ".join(r.name for r in curr.roads_to_avoid) + "."
+        )
     if prev is None:
         lines.append("This is the first official instruction for the area.")
         return "\n".join(lines)
@@ -247,7 +274,9 @@ def render_update_briefing(
         instruction_id=current_inst.publication_id,
         instruction_published_at=current_inst.published_at,
         source="published_instruction",
-        mode="gemini_grounded" if gemini.get_settings().gemini_enabled else "deterministic",
+        mode="gemini_grounded"
+        if gemini.get_settings().gemini_enabled
+        else "deterministic",
         audio_available=True,
         freshness=cache.freshness(area_id),
         language=language,
