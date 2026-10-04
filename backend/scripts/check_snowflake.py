@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 from cryptography.hazmat.primitives import serialization
 import snowflake.connector
 
-REPO_ROOT = Path(__file__).resolve().parent
+REPO_ROOT = Path(__file__).resolve().parents[2]
 load_dotenv(REPO_ROOT / ".env")
 
 

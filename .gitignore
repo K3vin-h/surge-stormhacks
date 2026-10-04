@@ -16,3 +16,12 @@ node_modules/
 backend/.demo-cleared
 .DS_Store
 Thumbs.db
+*.db-wal
+*.db-shm
+*.db-journal
+*.key
+.pytest_cache/
+.ruff_cache/
+.coverage
+.claude/worktrees/
+.claude/settings.local.json
