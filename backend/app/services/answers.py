@@ -142,7 +142,7 @@ def agent_turn(
         reply, event_type, summary = turn["reply"], turn["event_type"], turn["summary"]
         language = turn["language"]
         mode = "gemini_grounded"
-        remember = bool(reply)
+        remember = bool(reply) and turn.get("intent") != "off_topic"
     else:
         # Fallback: deterministic reply + keyword event extraction (English only).
         topic, _ = gemini.classify(question)
