@@ -45,31 +45,42 @@ export function createMap(element, data, { config, onVillage, onNotice, onCell }
   map.once('style.load', () => {
     for (const [id, value] of Object.entries({
       district: data.district, wards: data.wards, settlements: data.settlements, facilities: data.facilities,
-      'open-ground': data.open_ground, 'risk-zones': data.risk_zones,
+      'open-ground': data.open_ground, 'risk-zones': data.risk_zones, roads: data.roads,
       hazards: collection([{ type: 'Feature', properties: {}, geometry: data.hazards }]), routes: empty, destinations: empty
     })) map.addSource(id, { type: 'geojson', data: value });
     const layer = (id, type, source, paint, layout) => map.addLayer({ id, type, source, paint, ...(layout ? { layout } : {}) });
-    layer('wards-fill', 'fill', 'wards', { 'fill-color': '#76add5', 'fill-opacity': 0.12 });
-    layer('risk-fill', 'fill', 'risk-zones', { 'fill-color': ['match', ['get', 'risk_level'], 'Extreme', '#ef4444', 'High', '#fb923c', 'Moderate', '#facc15', 'Low', '#22c55e', '#94a3b8'], 'fill-opacity': 0.42 });
+    layer('district-fill', 'fill', 'district', { 'fill-color': '#64748b', 'fill-opacity': 0.45 });
+    layer('wards-fill', 'fill', 'wards', { 'fill-color': '#94a3b8', 'fill-opacity': 0.5 });
+    const riskColor = ['match', ['get', 'risk_level'], 'Extreme', '#dc2626', 'High', '#f97316', 'Moderate', '#facc15', 'Low', '#22c55e', '#94a3b8'];
+    layer('risk-fill', 'fill', 'risk-zones', { 'fill-color': riskColor, 'fill-opacity': 0.68 });
+    layer('risk-outline-halo', 'line', 'risk-zones', { 'line-color': '#0f172a', 'line-width': 3 });
+    layer('risk-outline', 'line', 'risk-zones', { 'line-color': riskColor, 'line-width': 1.5 });
     layer('hazards-fill', 'fill', 'hazards', { 'fill-color': '#ef4444', 'fill-opacity': 0.85 });
     layer('wards-halo', 'line', 'wards', { 'line-color': '#142b38', 'line-width': 6 });
     layer('wards-line', 'line', 'wards', { 'line-color': '#fff', 'line-width': 3 });
     layer('district-line', 'line', 'district', { 'line-color': '#fff', 'line-width': 4, 'line-dasharray': [3, 2] });
     layer('open-ground-fill', 'fill', 'open-ground', { 'fill-color': '#a78bfa', 'fill-opacity': 0.45 });
     layer('open-ground-line', 'line', 'open-ground', { 'line-color': '#ddd6fe', 'line-width': 2 });
+    layer('roads-halo', 'line', 'roads', { 'line-color': '#0f172a', 'line-width': ['interpolate', ['linear'], ['zoom'], 9, 2, 15, 7] });
+    layer('roads-line', 'line', 'roads', { 'line-color': '#f8fafc', 'line-width': ['interpolate', ['linear'], ['zoom'], 9, 0.7, 15, 3] });
+    layer('paths-line', 'line', 'roads', { 'line-color': '#fbbf24', 'line-width': 2, 'line-dasharray': [2, 2] });
+    map.setFilter('paths-line', ['in', ['get', 'highway'], ['literal', ['path', 'footway', 'steps', 'track']]]);
+    layer('closed-roads', 'line', 'roads', { 'line-color': '#f43f5e', 'line-width': 4, 'line-dasharray': [2, 1] });
+    map.setFilter('closed-roads', ['==', ['get', 'closed'], true]);
     layer('route-halo', 'line', 'routes', { 'line-color': '#142b38', 'line-width': 9 });
-    layer('routes-line', 'line', 'routes', { 'line-color': ['match', ['get', 'mode'], 'walking', '#67e8f9', '#fff'], 'line-width': 5 });
+    layer('routes-line', 'line', 'routes', { 'line-color': ['match', ['get', 'mode'], 'walking', '#67e8f9', '#c4b5fd'], 'line-width': 5 });
     layer('facilities-points', 'circle', 'facilities', { 'circle-color': '#b3cbd0', 'circle-radius': 4 });
     layer('destinations-points', 'circle', 'destinations', { 'circle-color': '#fff', 'circle-radius': 8, 'circle-stroke-color': '#178267', 'circle-stroke-width': 3 });
     layer('village-points', 'circle', 'settlements', { 'circle-color': '#fff', 'circle-radius': 5, 'circle-stroke-color': '#253d51', 'circle-stroke-width': 2 });
     layer('village-labels', 'symbol', 'settlements', { 'text-color': '#fff', 'text-halo-color': '#203545', 'text-halo-width': 2 }, { 'text-field': ['get', 'name'], 'text-size': 12, 'text-offset': [0, 1.2], 'text-anchor': 'top' });
+    layer('ward-labels', 'symbol', 'wards', { 'text-color': '#fff', 'text-halo-color': '#0f172a', 'text-halo-width': 2 }, { 'text-field': ['get', 'name'], 'text-size': 14 });
     map.on('click', 'village-points', event => {
       const id = event.features?.[0]?.properties?.id;
       if (typeof id === 'string') onVillage(id);
     });
     map.on('click', 'risk-fill', event => {
       const p = event.features?.[0]?.properties;
-      if (p) onCell(`${p.ward_name}: ${p.risk_level} risk (simulated)`);
+      if (p) onCell(`${p.ward_name}: ${p.risk_level} risk · ${p.provenance}. ${p.observed_at ? `Rain ${p.rainfall_mm_24h} mm/24h · river/warning ${p.river_level_ratio} · soil ${p.soil_moisture_pct}% · observed ${p.observed_at}` : 'No sensor assessment available.'}`);
     });
     map.on('mouseenter', 'village-points', () => { map.getCanvas().style.cursor = 'pointer'; });
     map.on('mouseleave', 'village-points', () => { map.getCanvas().style.cursor = ''; });

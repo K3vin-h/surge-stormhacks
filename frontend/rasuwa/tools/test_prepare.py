@@ -37,7 +37,8 @@ class PreparationTests(unittest.TestCase):
         source = json.loads((ROOT / "data/source.json").read_text())
         bundled = json.loads((ROOT / "data/prepared.json").read_text())
         digest = lambda value: hashlib.sha256(json.dumps(value, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
-        self.assertEqual(digest(prepare(source)), digest(bundled), "Bundled data needs regeneration")
+        sensors = json.loads((ROOT / "data/sensors.json").read_text())
+        self.assertEqual(digest(prepare(source, sensors)), digest(bundled), "Bundled data needs regeneration")
 
     def test_modes_preserve_vehicle_oneway_and_walking_bidirectional_edges(self):
         result = prepare(fixture())

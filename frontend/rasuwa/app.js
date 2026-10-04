@@ -95,6 +95,20 @@ async function start() {
       village.append(option);
     }
     element('scenario').textContent = data.scenario;
+    for (const reading of data.sensors?.readings || []) {
+      const ward = data.map.wards.features.find(feature => feature.properties.id === reading.ward_id);
+      const properties = data.map.risk_zones.features.find(feature => feature.properties.ward_id === reading.ward_id && feature.properties.sensor_risk_level)?.properties;
+      const card = document.createElement('article');
+      card.className = `sensor-card risk-${properties?.sensor_risk_level || 'Unknown'}`;
+      const title = document.createElement('strong');
+      title.textContent = `${ward?.properties.name || reading.ward_id} · ${properties?.sensor_risk_level || 'Unknown'}`;
+      const body = document.createElement('p');
+      body.textContent = `Rain ${reading.rainfall_mm_24h} mm/24h · river/warning ${reading.river_level_ratio} · soil ${reading.soil_moisture_pct}%`;
+      const time = document.createElement('small');
+      time.textContent = `Observed ${reading.observed_at} · ${data.sensors.provenance}`;
+      card.append(title, body, time);
+      element('sensor-readings').append(card);
+    }
     element('dataset-label').textContent = `${data.map.settlements.features.length} origins · ${data.map.wards.features.length} wards · dataset ${data.dataset_version}`;
     village.disabled = false;
     element('mode-controls').disabled = false;

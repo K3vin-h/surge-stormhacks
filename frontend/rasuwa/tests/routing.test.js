@@ -62,16 +62,22 @@ test('real migrated geography returns the nearby plot and removes it below 100 m
   assert.ok(plot);
   assert.equal(plot.route.distance_m, 334.9);
   assert.equal(recommend(data, { origin, mode: 'walking', maxDistance: 100 }).candidates.length, 0);
-  assert.deepEqual(new Set(data.map.risk_zones.features.map(f => f.properties.risk_level)), new Set(['Extreme', 'High', 'Moderate', 'Low']));
+  assert.deepEqual(new Set(data.map.risk_zones.features.map(f => f.properties.risk_level)), new Set(['Extreme', 'High', 'Moderate', 'Low', 'Unknown']));
 });
 
-test('all 28 village origins in both travel modes match the original model reference', async () => {
+test('all 28 village origins preserve reference paths except sensor-excluded destinations', async () => {
   const { recommend } = await load();
   const data = JSON.parse(await readFile(new URL('../data/prepared.json', import.meta.url)));
   const reference = JSON.parse(await readFile(new URL('./source-reference.json', import.meta.url)));
   for (const sample of reference.cases) {
     const result = recommend(data, { origin: sample.origin, mode: sample.mode, maxDistance: 50000 });
-    assert.deepEqual(result.candidates.map(c => ({ id: c.destination.shelter_id, distance: c.route.distance_m, roads: c.route.road_ids })), sample.candidates, `${sample.origin} ${sample.mode}`);
+    const expected = sample.candidates.filter(candidate => {
+      const reason = data.graphs[sample.mode].exclusions[candidate.id];
+      if (!reason) return true;
+      assert.match(reason, /assessed Low-risk zone/, 'Only sensor eligibility may change reference candidates');
+      return false;
+    });
+    assert.deepEqual(result.candidates.map(c => ({ id: c.destination.shelter_id, distance: c.route.distance_m, roads: c.route.road_ids })), expected, `${sample.origin} ${sample.mode}`);
     for (const candidate of result.candidates) {
       const graph = data.graphs[sample.mode];
       const nodes = new Map(Object.entries(graph.nodes).map(([id, coord]) => [coord.join(','), id]));
