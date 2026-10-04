@@ -15,7 +15,7 @@ class SubmitReportRequest(BaseModel):
     location: GeoPoint
     reported_at: datetime | None = None
     # Optional client idempotency key to prevent duplicate SOS pins on retry.
-    idempotency_key: str | None = None
+    idempotency_key: str | None = Field(None, max_length=128)
     # Browser device id; one active rescue_needed per device. Never echoed back.
     device_id: str | None = Field(None, max_length=128)
 

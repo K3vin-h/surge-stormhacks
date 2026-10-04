@@ -17,7 +17,7 @@ from .db.bootstrap import ensure_schema
 from .db.seed import seed_samples
 from .errors import ApiError, api_error_handler, unhandled_error_handler
 from .routers import areas, chat, demo_models, government, health, public
-from .services import cache, instructions
+from .services import instructions
 
 log = logging.getLogger("surge")
 logging.basicConfig(level=logging.INFO)
@@ -71,7 +71,12 @@ async def _validation_handler(request, exc: RequestValidationError) -> JSONRespo
                 "message": "Invalid input.",
                 "retryable": False,
                 "request_id": request.headers.get("x-request-id", "n/a"),
-                "detail": exc.errors(),
+                # Validator context can contain exceptions; raw input may be
+                # nonfinite. Return only JSON-safe diagnostic fields.
+                "detail": [
+                    {key: error[key] for key in ("type", "loc", "msg")}
+                    for error in exc.errors()
+                ],
             }
         },
     )

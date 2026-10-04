@@ -35,7 +35,7 @@ def _sqlite_path() -> Path:
 
 LOCAL_DB_PATH = _sqlite_path()
 _local: sqlite3.Connection | None = None
-sqlite3.register_adapter(datetime, lambda d: d.isoformat())
+sqlite3.register_adapter(datetime, lambda d: d.isoformat(timespec="microseconds"))
 
 
 def snowflake_configured() -> bool:

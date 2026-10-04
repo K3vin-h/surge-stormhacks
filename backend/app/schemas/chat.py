@@ -18,10 +18,10 @@ class ChatRequest(BaseModel):
     area_id: AreaId
     question: str = Field(..., min_length=1, max_length=2000)
     # Optional phone location so the middle layer can geo-tag an auto-report.
-    latitude: float | None = None
-    longitude: float | None = None
+    latitude: float | None = Field(None, ge=-90, le=90, allow_inf_nan=False)
+    longitude: float | None = Field(None, ge=-180, le=180, allow_inf_nan=False)
     # Optional language hint (BCP-47) carried from an earlier detected turn.
-    language: str | None = None
+    language: str | None = Field(None, max_length=35)
     # Browser device id (UUID from deviceId(), or its non-secure-context fallback):
     # a chat SOS moves the device's existing pin, and it keys conversation memory.
     device_id: str | None = Field(None, max_length=128)
@@ -53,9 +53,9 @@ class VoiceResponse(BaseModel):
 
 class TtsInstructionRequest(BaseModel):
     kind: Literal["instruction"]
-    instruction_id: str
+    instruction_id: str = Field(..., max_length=128)
 
 
 class TtsAssistantRequest(BaseModel):
     kind: Literal["assistant_response"]
-    response_id: str
+    response_id: str = Field(..., max_length=128)

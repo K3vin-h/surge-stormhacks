@@ -10,7 +10,6 @@ import logging
 from datetime import timedelta
 from unittest import mock
 
-from ..config import REPO_ROOT
 from ..schemas.common import GeoPoint
 from ..schemas.instructions import PublishInstructionRequest
 from ..schemas.reports import SubmitReportRequest
@@ -81,9 +80,11 @@ def seed_samples() -> None:
     if sf.snowflake_configured() or not _is_empty():
         return
     # An explicit government reset leaves the tables empty on purpose.
-    if (REPO_ROOT / "backend" / ".demo-cleared").exists():
-        return
     from ..services import events, instructions, reports
+    from ..services.slate import CLEARED_MARKER
+
+    if CLEARED_MARKER.exists():
+        return
 
     base = now_utc()
     clock = {"t": base}

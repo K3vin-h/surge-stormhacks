@@ -1,11 +1,12 @@
 """Shared enums and small value objects used across routes."""
 from __future__ import annotations
 
+import math
 from datetime import datetime
 from enum import Enum
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 # Canonical area IDs (API values). UI labels are mapped by the frontend.
 AREA_IDS = ("sunsari", "saptari", "bardiya", "kathmandu_valley", "rasuwa")
@@ -67,6 +68,16 @@ class GeoPoint(BaseModel):
 
     type: Literal["Point"] = "Point"
     coordinates: list[float] = Field(..., min_length=2, max_length=2)
+
+    @field_validator("coordinates")
+    @classmethod
+    def _in_range(cls, v: list[float]) -> list[float]:
+        lng, lat = v
+        if not (math.isfinite(lng) and math.isfinite(lat)):
+            raise ValueError("coordinates must be finite")
+        if not (-180 <= lng <= 180 and -90 <= lat <= 90):
+            raise ValueError("coordinates out of range: [lng -180..180, lat -90..90]")
+        return v
 
     @property
     def lng(self) -> float:

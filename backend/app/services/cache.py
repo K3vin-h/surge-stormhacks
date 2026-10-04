@@ -7,7 +7,6 @@ Also caches recent assistant responses so TTS can resolve them by ID.
 from __future__ import annotations
 
 import threading
-from typing import Any
 
 from ..schemas.common import (
     PublicationFreshness,

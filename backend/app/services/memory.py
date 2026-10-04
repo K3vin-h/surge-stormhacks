@@ -25,10 +25,10 @@ _lock = threading.Lock()
 _history: OrderedDict[str, tuple[deque[tuple[str, str]], float]] = OrderedDict()
 
 
-def _clean(text: str) -> str:
+def _clean(text: str, limit: int = MAX_MESSAGE_CHARS) -> str:
     # Collapse whitespace and any run of "=" so stored text can't forge the
     # prompt's "===" section markers, then bound its size.
-    return re.sub(r"=+", "=", " ".join(text.split()))[:MAX_MESSAGE_CHARS]
+    return re.sub(r"=+", "=", " ".join(text.split()))[:limit]
 
 
 def get(key: str | None) -> list[tuple[str, str]]:

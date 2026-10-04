@@ -26,7 +26,7 @@ def decode_cursor(cursor: str | None) -> int:
         return 0
     try:
         raw = base64.urlsafe_b64decode(cursor.encode()).decode()
-        return int(raw.split(":", 1)[1])
+        return max(0, int(raw.split(":", 1)[1]))
     except Exception:
         return 0
 

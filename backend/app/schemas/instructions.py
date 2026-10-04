@@ -10,13 +10,13 @@ from .common import AreaId, InstructionType, PublicationFreshness, Severity
 
 
 class PublishInstructionRequest(BaseModel):
-    publication_id: str = Field(..., min_length=1)
+    publication_id: str = Field(..., min_length=1, max_length=128)
     area_id: AreaId
     instruction_type: InstructionType
-    emergency_message: str = Field(..., min_length=1)
+    emergency_message: str = Field(..., min_length=1, max_length=2000)
     shelter_id: str | None = None
     approved_route_id: str | None = None
-    roads_to_avoid_ids: list[str] = []
+    roads_to_avoid_ids: list[str] = Field(default_factory=list, max_length=50)
     cancels_instruction_id: str | None = None
     update_frequency_minutes: int | None = None
     next_update_at: datetime | None = None
