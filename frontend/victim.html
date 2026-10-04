@@ -783,7 +783,9 @@
           body: JSON.stringify({ area_id: current, previous_instruction_id: prevId, language: userLang || "en" }),
         });
         if (data.briefing) {
-          addMsg("gov", "Government update", data.briefing.text);
+          // Pass response_id so the message gets a speaker/replay button — a
+          // manual fallback if autoplay is still blocked for this update.
+          addMsg("gov", "Government update", data.briefing.text, data.briefing.response_id);
           lastResponseId = data.briefing.response_id;
           playTts({ kind: "assistant_response", response_id: data.briefing.response_id });
         }
@@ -846,7 +848,30 @@
       $("agentStatus").textContent = label;
     }
 
-    let audio = null, ttsPending = 0, ttsGen = 0, pendingTts = null;
+    let audio = null, ttsPending = 0, ttsGen = 0, pendingTts = null, audioUnlocked = false, lastObjUrl = null;
+
+    function ensureAudioEl() {
+      if (!audio) audio = new Audio();
+      return audio;
+    }
+    // Browsers block programmatic audio.play() until the page has a user
+    // gesture / media engagement. Because playTts() only reaches .play() AFTER
+    // awaiting the fetch, that gesture has expired — so gov updates and AI
+    // replies silently fail. Unlock ONE shared element on the first interaction
+    // (a tiny silent clip inside the gesture); reuse it so later auto-plays work.
+    function unlockAudio() {
+      if (audioUnlocked) return;
+      audioUnlocked = true;
+      const a = ensureAudioEl();
+      try {
+        a.src = "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=";
+        const p = a.play();
+        if (p && p.then) p.then(() => a.pause()).catch(() => {});
+      } catch (_) {}
+    }
+    ["pointerdown", "keydown", "touchstart"].forEach((ev) =>
+      window.addEventListener(ev, unlockAudio, { once: true, passive: true }));
+
     async function playTts(payload, btn) {
       const gen = ++ttsGen;
       ttsPending++;
@@ -858,12 +883,21 @@
           method: "POST", headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
         });
-        if (!res.ok) { if (btn) toast("Audio isn’t available right now.", { error: true }); return; }
+        // Visible even for auto-plays (no btn): e.g. ElevenLabs quota exhausted.
+        if (!res.ok) { toast("Audio isn’t available right now.", { error: true }); return; }
         const blob = await res.blob();
         if (gen !== ttsGen) return; // cancelled by barge-in / end of call / newer clip
-        if (audio) audio.pause();
-        audio = new Audio(URL.createObjectURL(blob));
-        await audio.play();
+        const a = ensureAudioEl();
+        a.pause();
+        if (lastObjUrl) URL.revokeObjectURL(lastObjUrl);
+        lastObjUrl = URL.createObjectURL(blob);
+        a.src = lastObjUrl;
+        try {
+          await a.play();
+        } catch (_) {
+          // Autoplay blocked (no gesture yet). Point to the replay control.
+          toast("Tap the speaker icon to hear it.", { error: true });
+        }
       } catch (_) {
       } finally {
         ttsPending--;
