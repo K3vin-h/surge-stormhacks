@@ -28,6 +28,14 @@ macOS and Linux:
 
 Without Snowflake settings, startup creates `backend/local.db` and seeds it from `app/db/seed.py` when the tables are empty. That file stays on the machine that is running the server and is not committed. Published directives and dismissed cases are stored there until a Snowflake account is configured.
 
+Tests (run from `backend/`):
+
+```bash
+../.venv/bin/python -m pip install -r requirements-dev.txt
+../.venv/bin/python -m pytest
+node ../frontend/tests/device-id.test.cjs
+```
+
 ## What it does
 
 - **Snowflake (optional):** published instructions, community reports, gov events.
