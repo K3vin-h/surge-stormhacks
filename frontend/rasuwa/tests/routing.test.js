@@ -61,7 +61,7 @@ test('uses an interior ground node when reachable and falls back only when no in
   assert.equal(recommend(data, { origin: 'village', mode: 'walking', maxDistance: 500 }).candidates[0].route.distance_m, 100);
 });
 
-test('real migrated geography returns the nearby plot and removes it below 100 m', async () => {
+test('bundled geography returns the nearby plot and removes it below 100 m', async () => {
   const { recommend } = await load();
   const data = JSON.parse(await readFile(new URL('../data/prepared.json', import.meta.url)));
   const origin = data.map.settlements.features.find(f => f.properties.name === 'National Rainbow Trout Research Station, Dhunche').properties.id;
@@ -76,7 +76,7 @@ test('real migrated geography returns the nearby plot and removes it below 100 m
 test('all 28 village origins preserve reference paths except sensor-excluded destinations', async () => {
   const { recommend } = await load();
   const data = JSON.parse(await readFile(new URL('../data/prepared.json', import.meta.url)));
-  const reference = JSON.parse(await readFile(new URL('./source-reference.json', import.meta.url)));
+  const reference = JSON.parse(await readFile(new URL('./routing-reference.json', import.meta.url)));
   for (const sample of reference.cases) {
     const result = recommend(data, { origin: sample.origin, mode: sample.mode, maxDistance: 50000 });
     const expected = sample.candidates.filter(candidate => {

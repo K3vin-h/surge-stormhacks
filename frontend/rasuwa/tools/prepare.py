@@ -1,7 +1,7 @@
 """Prepare geographic overlays and admissible transport graphs, without a server.
 
 Run only when changing the bundled scenario. Browser searches require no Python.
-Ported from stormhacks-26's Rasuwa service; no backend imports or provider keys.
+No backend imports or provider keys are required.
 """
 import argparse
 import hashlib
