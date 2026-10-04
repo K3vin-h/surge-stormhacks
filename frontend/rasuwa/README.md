@@ -1,6 +1,6 @@
 # Rasuwa map and route planner
 
-This extends the standalone Rasuwa map and evacuation-candidate routing migrated from [`stormhacks-26`](https://github.com/awang1809/stormhacks-26), source commit `8b3c7ad189edc6f2cd354e5479ec59a7238c3edb`. It uses plain HTML/JavaScript, a JSON sensor heuristic, and an optional government workspace connected to the existing SURGE API. It does not import the source repository's backend or trained models.
+The Rasuwa map and route planner uses plain HTML/JavaScript, a JSON sensor heuristic, and an optional government workspace connected to the SURGE API.
 
 A separate [Sunsari planner](../sunsari/README.md) reuses these modules with its own full mapped road network, municipal boundaries, and simulated sensor JSON. The sidebar links between the two pages. Risk fills have no internal coverage outlines; real geographic boundaries and road outlines remain visible.
 
@@ -107,15 +107,14 @@ tools/.venv/bin/python tools/prepare.py
 
 Run `prepare.py` only after deliberately changing the source scenario or `sensors.json`.
 
-Preparation uses Shapely/pyproj to compute overlays and graph admission, once per dataset. It repairs polygon topology and clips projected bands back to original geographic coverage/wards. The prepared version includes a content fingerprint, so changing the scenario changes the version. The bundled-snapshot test detects drift. Regeneration has no network/provider dependency, no server process, and no training step. No importer refresh against live OSM is included: this migration intentionally retains the verified frozen source snapshot.
+Preparation uses Shapely/pyproj to compute overlays and graph admission, once per dataset. It repairs polygon topology and clips projected bands back to geographic coverage/wards. The prepared version includes a content fingerprint, so changing the scenario changes the version. The bundled-snapshot test detects drift. Regeneration has no network/provider dependency, no server process, and no training step. The planner uses a frozen geographic snapshot rather than refreshing live OSM data.
 
-The source-reference snapshot remains tied to the original geographic scenario. Sensor eligibility changes may exclude destinations, while remaining routes retain the original reference distances and roads.
+The routing-reference snapshot covers the bundled geographic scenario. Sensor eligibility changes may exclude destinations, while remaining routes retain the expected distances and roads.
 
 ## Verification
 
 - 6 Node tests passed, including all 56 reference cases with sensor exclusions.
 - 13 preparation tests passed, including sensor changes, unknown coverage, invalid readings and explicit motorcar permission overrides.
 - 6 Chromium browser tests passed, including government publication with intercepted API responses.
-- `backend/` and the source repository's implementation were not modified.
 
 Live government publication and provider integrations were not exercised. The government UI reuses the existing backend contract; it does not add Rasuwa to that backend's area catalog.

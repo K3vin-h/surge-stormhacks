@@ -1,4 +1,4 @@
-"""Exercise the migrated preparation code without importing either backend."""
+"""Exercise the geographic preparation code without importing the backend."""
 import copy
 import hashlib
 import json
