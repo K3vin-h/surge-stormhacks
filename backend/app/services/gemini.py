@@ -92,7 +92,8 @@ def _parse_json(text: str) -> dict | None:
     if t.startswith("```"):
         t = re.sub(r"^```(?:json)?\s*|\s*```$", "", t, flags=re.IGNORECASE).strip()
     try:
-        return json.loads(t)
+        data = json.loads(t)
+        return data if isinstance(data, dict) else None
     except json.JSONDecodeError:
         m = re.search(r"\{.*\}", t, flags=re.DOTALL)
         if m:
@@ -192,13 +193,15 @@ def detect_event_keyword(text: str) -> str:
 _BCP47 = re.compile(r"^[A-Za-z]{2,3}(-[A-Za-z0-9]{2,8}){0,3}$")
 
 
-def safe_lang(code: str | None) -> str | None:
+def safe_lang(code: object) -> str | None:
     """A client/model-supplied language code, only if it looks like BCP-47.
 
     The code is interpolated into prompts, so anything else (free text, an
     injection attempt) is dropped rather than trusted.
     """
-    code = (code or "").strip()
+    if not isinstance(code, str):
+        return None
+    code = code.strip()
     return code if _BCP47.match(code) else None
 
 
@@ -252,13 +255,17 @@ def converse(
     data = _parse_json(text) if text else None
     if data is None:
         return None
+    reply = data.get("reply")
+    if not isinstance(reply, str) or not reply.strip():
+        return None
     event = data.get("event_type", "none")
-    if event not in REPORT_KINDS:
+    if not isinstance(event, str) or event not in REPORT_KINDS:
         event = "none"
+    summary = data.get("summary")
     return {
-        "reply": (data.get("reply") or "").strip(),
+        "reply": reply.strip(),
         "event_type": event,
-        "summary": (data.get("summary") or "").strip(),
+        "summary": summary.strip() if isinstance(summary, str) else "",
         "language": safe_lang(data.get("language")) or "en",
     }
 
@@ -317,6 +324,6 @@ def classify(question: str) -> tuple[str, str]:
     if data is None:
         return classify_keyword(question), "deterministic"
     topic = data.get("topic", "unsupported")
-    if topic not in ALLOWED_TOPICS:
+    if not isinstance(topic, str) or topic not in ALLOWED_TOPICS:
         topic = "unsupported"
     return topic, "gemini_grounded"

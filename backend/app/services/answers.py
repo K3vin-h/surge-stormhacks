@@ -131,8 +131,6 @@ def agent_turn(
         reply, event_type, summary = turn["reply"], turn["event_type"], turn["summary"]
         language = turn["language"]
         mode = "gemini_grounded"
-        if not reply:
-            reply = _status_text(inst) if inst else _no_instruction(area_id)
     else:
         # Fallback: deterministic reply + keyword event extraction (English only).
         topic, _ = gemini.classify(question)
@@ -242,8 +240,10 @@ def render_update_briefing(
 ) -> AssistantResponse:
     """Automatic government-update briefing: what changed + does it affect you,
     written in the user's language."""
+    language = gemini.safe_lang(language) or "en"
     change_text = _diff_text(previous_inst, current_inst)
     summary = gemini.summarize_update(build_context(area_id), change_text, language)
+    mode = "gemini_grounded" if summary else "deterministic"
     if not summary:
         # Deterministic fallback is English-only.
         summary = _deterministic_update_summary(previous_inst, current_inst)
@@ -257,9 +257,7 @@ def render_update_briefing(
         instruction_id=current_inst.publication_id,
         instruction_published_at=current_inst.published_at,
         source="published_instruction",
-        mode="gemini_grounded"
-        if gemini.get_settings().gemini_enabled
-        else "deterministic",
+        mode=mode,
         audio_available=True,
         freshness=cache.freshness(area_id),
         language=language,
