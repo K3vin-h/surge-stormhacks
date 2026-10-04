@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>SURGE — Rasuwa Route Planner</title>
+  <title>SURGE — Rasuwa Operations</title>
   <link rel="stylesheet" href="vendor/maplibre-gl.css" />
   <link rel="stylesheet" href="styles.css" />
 </head>
@@ -11,7 +11,7 @@
   <header><a class="brand" href="../index.html">SURGE <span>Rasuwa Route Planner</span></a><nav aria-label="SURGE navigation"><a href="../gov.html">Government</a><a href="../victim.html">Resident app</a></nav></header>
   <div class="simulation">Hackathon simulation. Real mapped geography; simulated flood scenario. No live emergency guidance.</div>
   <main>
-    <div class="intro"><div><p class="eyebrow">RASUWA / GOSAIKUNDA, NEPAL</p><h1>Compare nearby destinations.</h1><p>Choose a village, inspect mapped routes, and review access before making a decision.</p></div><span class="badge">Runs in your browser</span></div>
+    <div class="intro"><div><p class="eyebrow">RASUWA / GOSAIKUNDA, NEPAL</p><h1>Regional risk &amp; response.</h1><p>Inspect sensor risk, compare mapped routes, and manage government operations.</p></div><span class="badge">Sensor JSON + mapped geography</span></div>
     <div id="load-error" role="alert" hidden></div>
     <div class="workspace">
       <aside aria-label="Route planning">
@@ -30,12 +30,30 @@
         <div class="map-toolbar"><span id="dataset-label">Rasuwa geographic workspace</span><button id="overview" disabled>Map overview</button></div>
         <div class="map-frame"><div id="map" aria-label="Satellite map of Rasuwa"></div><div id="map-caption">Strong outlines: real mapped ward cells • white dots: villages</div></div>
         <p id="map-notice" role="status" hidden></p>
-        <div class="risk-legend" aria-label="Flood risk legend"><span>🔴 Extreme risk</span><span>🟠 High risk</span><span>🟡 Moderate risk</span><span>🟢 Low risk</span><small>Simulated proximity bands. Green does not establish safety. Uncolored areas are unassessed.</small></div>
-        <p class="note">White boundaries: wards · purple patches: mapped open ground · cyan routes: walking · white routes: vehicle.</p>
+        <div class="risk-legend" aria-label="Flood risk legend"><span>🔴 Extreme risk ≥ 0.80</span><span>🟠 High risk ≥ 0.55</span><span>🟡 Moderate risk ≥ 0.30</span><span>🟢 Low risk &lt; 0.30</span><span>⚪ Gray: unassessed</span><small>JSON sensor heuristic with simulated hazard bands as a minimum risk. Green does not establish safety. Click a region for its readings.</small></div>
+        <p class="note">White boundaries: wards · white roads with dark outlines · dashed gold: paths · dashed red: closed roads · purple patches: open ground · cyan route: walking · lavender route: vehicle.</p>
+        <section class="panel" aria-label="Regional sensor readings"><h2>Regional sensor readings</h2><p class="note">Bundled simulated readings, not a live feed. Gray regions have no assessment or lie outside analysis coverage.</p><div id="sensor-readings" class="sensor-grid"></div></section>
         <p id="scenario" class="note"></p>
         <p class="note">High-ground certification needs reviewed elevation, slope, and access evidence. Terrain tilt is a camera view, not measured terrain. No trained flood-risk or satellite-damage model is included.</p>
       </section>
     </div>
+    <section class="government panel" aria-label="Government operations">
+      <div class="operations-header"><div><p class="eyebrow">GOVERNMENT WORKSPACE</p><h2>Coordinate the response</h2></div><button id="gov-connect" type="button">Connect government API</button></div>
+      <p class="note">The API currently serves Sunsari, Saptari, Bardiya and Kathmandu Valley. Directives apply to the selected API area; the Rasuwa map and local routes remain separate.</p>
+      <p id="gov-status" role="status">Connect to load ranked areas, reports and operational events.</p>
+      <div class="operations-grid">
+        <section><h3>Areas ranked by priority</h3><label for="gov-area">Government area</label><select id="gov-area" disabled></select><div id="gov-areas"></div><button id="gov-refresh-model" type="button" disabled>Recompute area models</button></section>
+        <section><h3>Publish / update directive</h3><form id="gov-form"><fieldset id="gov-fields" disabled><legend>Selected government area</legend>
+          <label for="gov-type">Instruction type</label><select id="gov-type"><option value="evacuate">Evacuate</option><option value="shelter_in_place">Shelter in place</option><option value="advisory">Advisory</option><option value="all_clear">All clear</option></select>
+          <label for="gov-message">Emergency message</label><textarea id="gov-message" rows="3" required maxlength="2000"></textarea>
+          <div id="gov-evac"><label for="gov-shelter">Shelter</label><select id="gov-shelter"></select><label for="gov-route">Approved route</label><select id="gov-route"></select></div>
+          <label for="gov-roads">Roads to avoid</label><select id="gov-roads" multiple size="3"></select>
+          <label for="gov-frequency">Update frequency (minutes)</label><input id="gov-frequency" type="number" min="1" max="10080" value="60" required>
+          <button class="primary" id="gov-publish" type="submit">Publish directive</button>
+        </fieldset></form><p id="gov-publish-status" role="status"></p></section>
+        <section><h3>Operational events</h3><div id="gov-events">Connect to load events.</div><h3>Incoming community reports</h3><div id="gov-reports">Connect to load reports.</div></section>
+      </div>
+    </section>
   </main>
   <noscript>JavaScript is required to display geographic data and calculate routes.</noscript>
   <script type="module">
@@ -45,5 +63,6 @@
       error.textContent = 'The map application could not start. Run npm ci in frontend/rasuwa to prepare local MapLibre assets, then reload.';
     });
   </script>
+  <script type="module" src="government.js"></script>
 </body>
 </html>

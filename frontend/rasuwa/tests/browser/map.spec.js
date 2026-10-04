@@ -28,6 +28,8 @@ test('home entry opens an independent map and distance changes clear route selec
   await expect(page.getByLabel('Flood risk legend')).toContainText('Moderate');
   await expect(page.getByLabel('Flood risk legend')).toContainText('Low');
   await page.screenshot({ path: test.info().outputPath('desktop.png'), fullPage: true });
+  await page.getByRole('button', { name: 'Map overview' }).click();
+  await page.screenshot({ path: test.info().outputPath('overview.png'), fullPage: true });
   await page.getByLabel('Walking limit (metres)').fill('100');
   await expect(page.getByRole('button', { name: /Pasture demonstration plots/ })).toHaveCount(0);
   await expect(page.getByRole('heading', { name: 'Selected route' })).toHaveCount(0);
