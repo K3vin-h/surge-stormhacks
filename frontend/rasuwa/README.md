@@ -91,7 +91,7 @@ The source-reference snapshot remains tied to the original geographic scenario. 
 ## Verification
 
 - 6 Node tests passed, including all 56 reference cases with sensor exclusions.
-- 12 preparation tests passed, including sensor changes, unknown coverage and invalid readings.
+- 13 preparation tests passed, including sensor changes, unknown coverage, invalid readings and explicit motorcar permission overrides.
 - 6 Chromium browser tests passed, including government publication with intercepted API responses.
 - `backend/` and the source repository's implementation were not modified.
 
