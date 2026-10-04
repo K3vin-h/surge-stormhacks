@@ -51,8 +51,12 @@ export function createMap(element, data, { config, onVillage, onNotice, onCell }
     const layer = (id, type, source, paint, layout) => map.addLayer({ id, type, source, paint, ...(layout ? { layout } : {}) });
     layer('district-fill', 'fill', 'district', { 'fill-color': '#64748b', 'fill-opacity': 0.45 });
     layer('wards-fill', 'fill', 'wards', { 'fill-color': '#94a3b8', 'fill-opacity': 0.5 });
-    const riskColor = ['match', ['get', 'risk_level'], 'Extreme', '#dc2626', 'High', '#f97316', 'Moderate', '#facc15', 'Low', '#22c55e', '#94a3b8'];
-    layer('risk-fill', 'fill', 'risk-zones', { 'fill-color': riskColor, 'fill-opacity': 0.68 });
+    const levelColor = level => ['match', level, 'Extreme', '#dc2626', 'High', '#f97316', 'Moderate', '#facc15', 'Low', '#22c55e', '#94a3b8'];
+    // Outside the hazard-proximity analysis a ward is colored by its own sensor reading (lighter fill);
+    // it stays gray only when the ward has no reading.
+    const sensorOnly = ['==', ['get', 'risk_level'], 'Unknown'];
+    const riskColor = ['case', sensorOnly, levelColor(['get', 'sensor_risk_level']), levelColor(['get', 'risk_level'])];
+    layer('risk-fill', 'fill', 'risk-zones', { 'fill-color': riskColor, 'fill-opacity': ['case', sensorOnly, 0.4, 0.68] });
     layer('risk-outline-halo', 'line', 'risk-zones', { 'line-color': '#0f172a', 'line-width': 3 });
     layer('risk-outline', 'line', 'risk-zones', { 'line-color': riskColor, 'line-width': 1.5 });
     layer('hazards-fill', 'fill', 'hazards', { 'fill-color': '#ef4444', 'fill-opacity': 0.85 });

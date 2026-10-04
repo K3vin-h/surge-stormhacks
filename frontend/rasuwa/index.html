@@ -72,8 +72,8 @@
               <span><i class="sw sw-high"></i>High risk ≥ 0.55</span>
               <span><i class="sw sw-moderate"></i>Moderate risk ≥ 0.30</span>
               <span><i class="sw sw-low"></i>Low risk &lt; 0.30</span>
-              <span><i class="sw sw-gray"></i>Gray: unassessed</span>
-              <small>JSON sensor heuristic with simulated hazard bands as a minimum risk. Green does not establish safety. Click a region for its readings.</small>
+              <span><i class="sw sw-gray"></i>Gray: no sensor reading</span>
+              <small>JSON sensor heuristic with simulated hazard bands as a minimum risk. Lighter fills are ward sensor readings only, outside the hazard-band analysis. Green does not establish safety. Click a region for its readings.</small>
             </div>
             <p class="note map-key">White boundaries: wards · white roads with dark outlines · dashed gold: paths · dashed red: closed roads · purple patches: open ground · cyan route: walking · lavender route: vehicle.</p>
           </section>
@@ -81,7 +81,7 @@
 
         <section class="card panel" aria-label="Regional sensor readings">
           <div class="panel-head"><div><div class="eyebrow">Sensors</div><h2>Regional sensor readings</h2></div><span class="tag">Simulated</span></div>
-          <p class="note">Bundled simulated readings, not a live feed. Gray regions have no assessment or lie outside analysis coverage.</p>
+          <p class="note">Bundled simulated readings, not a live feed. Gray regions have no sensor reading. Lighter regions outside the hazard analysis use the ward sensor reading alone.</p>
           <div id="sensor-readings" class="sensor-grid"></div>
           <p id="scenario" class="note"></p>
           <p class="note">High-ground certification needs reviewed elevation, slope, and access evidence. Terrain tilt is a camera view, not measured terrain. No trained flood-risk or satellite-damage model is included.</p>
