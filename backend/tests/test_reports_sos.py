@@ -96,6 +96,108 @@ def test_retry_of_move_is_noop():
     assert _rows("d1")[0]["VERIFICATION_STATE"] == "actioned"
 
 
+@pytest.mark.parametrize("key,lng", [("k1", 85.0), ("k2", 86.0)])
+def test_retry_of_earlier_sos_keeps_latest_location_and_actioned_state(key, lng):
+    first, *_ = reports.submit(_req("d1", key="k1", lng=85.0))
+    reports.submit(_req("d1", key="k2", lng=86.0))
+    reports.submit(_req("d1", key="k3", lng=87.0))
+    reports.set_state(first.report_id, VerificationState.actioned)
+    event_count = len(sf.query("SELECT * FROM EVENTS"))
+    report, created, moved = reports.submit(_req("d1", key=key, lng=lng))
+    assert (report.report_id, created, moved) == (first.report_id, False, False)
+    assert report.location.lng == 87.0
+    assert report.verification_state == VerificationState.actioned
+    assert len(_rows("d1")) == 1
+    assert len(sf.query("SELECT * FROM EVENTS")) == event_count
+
+
+def test_retry_from_previous_area_does_not_move_pin_back():
+    from app.fixtures import areas as fx
+    a1, a2 = list(fx.AREAS)[:2]
+    first, *_ = reports.submit(_req("d1", area=a1, key="old"))
+    reports.submit(_req("d1", area=a2, key="new", lng=86.0))
+    reports.set_state(first.report_id, VerificationState.resolved)
+    retry, created, moved = reports.submit(_req("d1", area=a1, key="old"))
+    assert (retry.report_id, created, moved) == (first.report_id, False, False)
+    assert retry.area_id == a2
+    assert retry.location.lng == 86.0
+    assert retry.verification_state == VerificationState.resolved
+
+
+def test_move_preserves_legacy_key_without_history():
+    first, *_ = reports.submit(_req("d1", key="legacy"))
+    sf.execute("DELETE FROM REPORT_REQUEST_KEYS")
+    reports.submit(_req("d1", key="new", lng=86.0))
+    retry, created, moved = reports.submit(_req("d1", key="legacy"))
+    assert (retry.report_id, created, moved) == (first.report_id, False, False)
+    assert retry.location.lng == 86.0
+
+
+def test_earlier_retry_remains_noop_after_database_reconnect(monkeypatch):
+    first, *_ = reports.submit(_req("d1", key="old"))
+    reports.submit(_req("d1", key="new", lng=86.0))
+    reports.set_state(first.report_id, VerificationState.actioned)
+    sf._local.close()
+    monkeypatch.setattr(sf, "_local", None)
+    bootstrap.ensure_schema()
+    retry, created, moved = reports.submit(_req("d1", key="old"))
+    assert (created, moved) == (False, False)
+    assert retry.location.lng == 86.0
+    assert retry.verification_state == VerificationState.actioned
+
+
+@pytest.mark.parametrize("retry_before_next_move", [False, True])
+def test_retry_recovers_after_history_registration_fails(monkeypatch, retry_before_next_move):
+    first, *_ = reports.submit(_req("d1", key="old"))
+    execute = sf.execute
+
+    def fail_new_history(sql, params=None):
+        if "INSERT INTO REPORT_REQUEST_KEYS" in sql and params[1] == "new":
+            raise RuntimeError("History write interrupted")
+        return execute(sql, params)
+
+    with monkeypatch.context() as patch:
+        patch.setattr(sf, "execute", fail_new_history)
+        with pytest.raises(RuntimeError, match="History write interrupted"):
+            reports.submit(_req("d1", key="new", lng=86.0))
+    reports.set_state(first.report_id, VerificationState.actioned)
+    if retry_before_next_move:
+        retry, created, moved = reports.submit(_req("d1", key="new", lng=86.0))
+        assert (created, moved) == (False, False)
+        assert retry.location.lng == 86.0
+        assert retry.verification_state == VerificationState.actioned
+    reports.submit(_req("d1", key="newest", lng=87.0))
+    reports.set_state(first.report_id, VerificationState.actioned)
+    retry, created, moved = reports.submit(_req("d1", key="new", lng=86.0))
+    assert (created, moved) == (False, False)
+    assert retry.location.lng == 87.0
+    assert retry.verification_state == VerificationState.actioned
+    old_retry, created, moved = reports.submit(_req("d1", key="old"))
+    assert (created, moved) == (False, False)
+    assert old_retry.location.lng == 87.0
+
+
+def test_failed_legacy_key_preservation_aborts_move(monkeypatch):
+    first, *_ = reports.submit(_req("d1", key="legacy"))
+    reports.set_state(first.report_id, VerificationState.actioned)
+    sf.execute("DELETE FROM REPORT_REQUEST_KEYS")
+    execute = sf.execute
+
+    def fail_history(sql, params=None):
+        if "INSERT INTO REPORT_REQUEST_KEYS" in sql:
+            raise RuntimeError("History write interrupted")
+        return execute(sql, params)
+
+    with monkeypatch.context() as patch:
+        patch.setattr(sf, "execute", fail_history)
+        with pytest.raises(RuntimeError, match="History write interrupted"):
+            reports.submit(_req("d1", key="new", lng=86.0))
+    row = _rows("d1")[0]
+    assert row["LONGITUDE"] == 85.0
+    assert row["IDEMPOTENCY_KEY"] == "legacy"
+    assert row["VERIFICATION_STATE"] == "actioned"
+
+
 def test_no_device_id_never_dedupes():
     reports.submit(_req(None))
     reports.submit(_req(None))

@@ -35,6 +35,18 @@ def submit(req: SubmitReportRequest) -> tuple[Report, bool, bool]:
         return _submit(req)
 
 
+def _remember_request(area_id: str, key: str | None, report_id: str) -> None:
+    if not key:
+        return
+    sf.execute(
+        """INSERT INTO REPORT_REQUEST_KEYS (AREA_ID, IDEMPOTENCY_KEY, REPORT_ID)
+           SELECT %s, %s, %s WHERE NOT EXISTS (
+               SELECT 1 FROM REPORT_REQUEST_KEYS WHERE AREA_ID = %s AND IDEMPOTENCY_KEY = %s
+           )""",
+        [area_id, key, report_id, area_id, key],
+    )
+
+
 def _submit(req: SubmitReportRequest) -> tuple[Report, bool, bool]:
     """Returns (report, created, moved). Idempotent on idempotency_key when provided.
 
@@ -43,10 +55,20 @@ def _submit(req: SubmitReportRequest) -> tuple[Report, bool, bool]:
     """
     if req.idempotency_key:
         existing = sf.query_one(
+            """SELECT r.* FROM REPORT_REQUEST_KEYS k JOIN REPORTS r ON r.REPORT_ID = k.REPORT_ID
+               WHERE k.IDEMPOTENCY_KEY = %s AND k.AREA_ID = %s""",
+            [req.idempotency_key, req.area_id],
+        )
+        if existing:
+            return _row_to_report(existing), False, False
+        # Legacy rows and a write interrupted before key registration still
+        # retain their latest key on REPORTS. Preserve it before the next move.
+        existing = sf.query_one(
             "SELECT * FROM REPORTS WHERE IDEMPOTENCY_KEY = %s AND AREA_ID = %s",
             [req.idempotency_key, req.area_id],
         )
         if existing:
+            _remember_request(req.area_id, req.idempotency_key, existing["REPORT_ID"])
             return _row_to_report(existing), False, False
 
     received_at = now_utc()
@@ -57,6 +79,7 @@ def _submit(req: SubmitReportRequest) -> tuple[Report, bool, bool]:
             [req.device_id, ReportKind.rescue_needed.value, VerificationState.resolved.value],
         )
         if prior:
+            _remember_request(prior["AREA_ID"], prior.get("IDEMPOTENCY_KEY"), prior["REPORT_ID"])
             sf.execute(
                 """UPDATE REPORTS SET AREA_ID = %s, LONGITUDE = %s, LATITUDE = %s,
                        MESSAGE = %s, REPORTED_AT = %s, RECEIVED_AT = %s,
@@ -72,6 +95,7 @@ def _submit(req: SubmitReportRequest) -> tuple[Report, bool, bool]:
                 MESSAGE=req.message, REPORTED_AT=req.reported_at, RECEIVED_AT=received_at,
                 VERIFICATION_STATE=VerificationState.unverified.value,
             )
+            _remember_request(req.area_id, req.idempotency_key, prior["REPORT_ID"])
             events.record_event(
                 "report_update", f"rescue_needed moved in {req.area_id}", req.area_id
             )
@@ -100,6 +124,7 @@ def _submit(req: SubmitReportRequest) -> tuple[Report, bool, bool]:
             req.idempotency_key, report.provenance, req.device_id,
         ],
     )
+    _remember_request(req.area_id, req.idempotency_key, report.report_id)
     events.record_event(
         "distress_report" if req.kind != ReportKind.road_hazard else "road_closure",
         f"{req.kind.value} reported in {req.area_id}",
