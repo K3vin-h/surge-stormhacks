@@ -2,6 +2,8 @@
 
 **Bridging the communication gap between government bodies and citizens during floods.**
 
+**[Watch the demo video](demo.mp4)**
+
 SURGE is a hackathon prototype that brings official instructions, regional risk information, mapped routes, and community reports into one flood-response platform. It gives government teams a shared workspace and residents a place to understand the latest guidance and ask for help.
 
 ## Why we built it
@@ -18,7 +20,8 @@ We built SURGE to make those next steps easier to communicate. Government bodies
 
 - View regional risk and decision-support signals.
 - Publish official instructions for specific areas.
-- Review community reports and SOS requests.
+- Review community reports and SOS requests, then mark them as helped, duplicate, or false, with undo.
+- Mark roads as closed or flooded from the regional planners; resident routes avoid them.
 - Track alerts, published instructions, and response activity.
 - Compare walking and vehicle routes using the Rasuwa and Sunsari planners.
 
@@ -27,9 +30,9 @@ We built SURGE to make those next steps easier to communicate. Government bodies
 ### Resident app
 
 - Read the latest official instruction for an area and browse alert history.
-- View mapped route options to candidate evacuation destinations.
+- View mapped route options to candidate evacuation destinations. In Rasuwa, routes update when officials close or flag roads.
 - Submit field reports and SOS requests.
-- Ask questions about published guidance through a chat interface, with multilingual voice support when providers are configured.
+- Ask questions about published guidance through a chat interface, with multilingual voice support when providers are configured. The assistant remembers recent messages on each device and starts fresh when a new instruction is published.
 
 
 
