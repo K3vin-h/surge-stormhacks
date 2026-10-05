@@ -2,7 +2,7 @@
 
 **Bridging the communication gap between government bodies and citizens during floods.**
 
-**[Watch the demo video](demo.mp4)**
+**[Watch the demo video](https://drive.google.com/file/d/1u7yX_WwY8k1j2PhCkqQuyUHkEsvnVuBi/view?usp=sharing)**
 
 SURGE is a hackathon prototype that brings official instructions, regional risk information, mapped routes, and community reports into one flood-response platform. It gives government teams a shared workspace and residents a place to understand the latest guidance and ask for help.
 
